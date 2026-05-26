@@ -11,7 +11,7 @@ function formatPost(rankings: RoomRanking[], notes: string[], intro: string): st
     const rank = total - i
     lines.push(`מקום ${rank} — ${r.room.name}`)
     lines.push(`${r.room.company}, ${r.room.city} | ${r.room.time_limit} דקות`)
-    lines.push(`ציון כולל: ${r.overall.toFixed(1)}/40 | פאזלים: ${r.puzzles} | סיפור: ${r.story_theme} | אווירה: ${r.atmosphere} | קושי: ${r.difficulty}`)
+    lines.push(`ציון כולל: ${r.overall.toFixed(1)} | פאזלים: ${r.puzzles} | סיפור: ${r.story_theme} | אווירה: ${r.atmosphere} | קושי: ${r.difficulty}`)
     if (notes[i]?.trim()) lines.push(notes[i].trim())
     lines.push('')
   })
@@ -73,10 +73,7 @@ export default function ShareEditor({ rankings }: { rankings: RoomRanking[] }) {
                   {r.room.company} · {r.room.city} · {r.room.time_limit} דקות
                 </p>
               </div>
-              <div className="shrink-0 text-right">
-                <span className="text-3xl font-bold text-orange-400">{r.overall.toFixed(1)}</span>
-                <span className="text-lg font-semibold text-orange-700">/40</span>
-              </div>
+              <span className="text-3xl font-bold text-orange-400 shrink-0">{r.overall.toFixed(1)}</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1.5 mb-3">

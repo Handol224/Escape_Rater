@@ -126,7 +126,7 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
       {total !== null && (
         <div className="bg-orange-900/20 border border-orange-700/40 rounded-xl p-4 mb-5 flex items-center justify-between">
           <span className="text-gray-300 font-medium">הציון הכולל שלך</span>
-          <span className="text-3xl font-bold text-orange-400">{total}<span className="text-lg text-orange-600">/40</span></span>
+          <span className="text-3xl font-bold text-orange-400">{total}</span>
         </div>
       )}
 

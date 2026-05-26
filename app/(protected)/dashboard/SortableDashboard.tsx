@@ -22,7 +22,7 @@ function OverallBadge({ value, highlight }: { value: number; highlight?: boolean
     : 'text-gray-600'
   return (
     <span className={`font-bold tabular-nums ${color}`}>
-      {value > 0 ? <>{value.toFixed(1)}<span className="text-sm opacity-60">/40</span></> : '—'}
+      {value > 0 ? value.toFixed(1) : '—'}
     </span>
   )
 }
@@ -72,7 +72,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
         {[
           { label: 'Sessions', value: stats.totalSessions.toString() },
           { label: 'Rooms rated', value: stats.totalRooms.toString() },
-          { label: 'Avg score', value: stats.avgScore > 0 ? `${stats.avgScore.toFixed(1)}/40` : '—' },
+          { label: 'Avg score', value: stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '—' },
           { label: 'Escape rate', value: stats.escapeRate !== null ? `${stats.escapeRate}%` : '—' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
