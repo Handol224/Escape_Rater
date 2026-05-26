@@ -56,7 +56,6 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
     story_theme: existing?.story_theme ?? 0,
     atmosphere: existing?.atmosphere ?? 0,
     difficulty: existing?.difficulty ?? 0,
-    game_master: existing?.game_master ?? 0,
   })
   const [comment, setComment] = useState(existing?.comment ?? '')
   const [error, setError] = useState('')
@@ -64,13 +63,11 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
   const [done, setDone] = useState(false)
 
   const allScored = Object.values(scores).every(v => v > 0)
-  const overall = allScored
-    ? (Object.values(scores).reduce((s, v) => s + v, 0) / 5).toFixed(1)
-    : null
+  const total = allScored ? Object.values(scores).reduce((s, v) => s + v, 0) : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!allScored) { setError('Please score all 5 categories.'); return }
+    if (!allScored) { setError('יש לדרג את כל 4 הקטגוריות.'); return }
     setError('')
     setLoading(true)
 
@@ -79,6 +76,7 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
       game_slot_id: slotId,
       user_id: userId,
       ...scores,
+      game_master: existing?.game_master ?? 5,
       comment: comment.trim() || null,
     }
 
@@ -100,8 +98,8 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
     return (
       <div className="text-center py-16">
         <div className="text-5xl mb-3">✅</div>
-        <h2 className="text-xl font-bold text-white">Rating saved!</h2>
-        <p className="text-gray-400 mt-1">Redirecting…</p>
+        <h2 className="text-xl font-bold text-white">הדירוג נשמר!</h2>
+        <p className="text-gray-400 mt-1">מעביר...</p>
       </div>
     )
   }
@@ -125,24 +123,23 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
         ))}
       </div>
 
-      {/* Overall preview */}
-      {overall && (
+      {total !== null && (
         <div className="bg-orange-900/20 border border-orange-700/40 rounded-xl p-4 mb-5 flex items-center justify-between">
-          <span className="text-gray-300 font-medium">Your overall score</span>
-          <span className="text-3xl font-bold text-orange-400">{overall}</span>
+          <span className="text-gray-300 font-medium">הציון הכולל שלך</span>
+          <span className="text-3xl font-bold text-orange-400">{total}<span className="text-lg text-orange-600">/40</span></span>
         </div>
       )}
 
-      {/* Comment */}
       <div className="mb-5">
         <label className="block text-sm font-medium text-gray-300 mb-1.5">
-          Comment <span className="text-gray-600">(optional)</span>
+          תגובה <span className="text-gray-600">(רשות)</span>
         </label>
         <textarea
+          dir="rtl"
           value={comment}
           onChange={e => setComment(e.target.value)}
           rows={3}
-          placeholder="What stood out? Any highlights or lowlights?"
+          placeholder="מה בלט? מה היה טוב או פחות טוב?"
           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500 resize-none"
         />
       </div>
@@ -152,7 +149,7 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
         disabled={loading || !allScored}
         className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors"
       >
-        {loading ? 'Saving…' : existing ? 'Update Rating' : 'Submit Rating'}
+        {loading ? 'שומר...' : existing ? 'עדכן דירוג' : 'שלח דירוג'}
       </button>
     </form>
   )

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { EscapeRoom, RoomRanking, SortKey } from '@/lib/types'
+import type { EscapeRoom, RoomRanking } from '@/lib/types'
 import { SORT_LABELS } from '@/lib/types'
 import SortableDashboard from './SortableDashboard'
 
@@ -19,15 +19,14 @@ async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: 
   const { data: slots } = await supabase.from('game_slots').select('id, escape_room_id, escaped')
   const { data: ratings } = await supabase
     .from('ratings')
-    .select('game_slot_id, puzzles, story_theme, atmosphere, difficulty, game_master')
+    .select('game_slot_id, puzzles, story_theme, atmosphere, difficulty')
 
   const rankings: RoomRanking[] = rooms.map((room: EscapeRoom) => {
-    const roomSlots = (slots ?? []).filter(s => s.escape_room_id === room.id)
-    const roomSlotIds = roomSlots.map(s => s.id)
+    const roomSlotIds = (slots ?? []).filter(s => s.escape_room_id === room.id).map(s => s.id)
     const roomRatings = (ratings ?? []).filter(r => roomSlotIds.includes(r.game_slot_id))
     const n = roomRatings.length
 
-    if (n === 0) return { room, overall: 0, puzzles: 0, story_theme: 0, atmosphere: 0, difficulty: 0, game_master: 0, total_ratings: 0, slots_played: roomSlotIds.length }
+    if (n === 0) return { room, overall: 0, puzzles: 0, story_theme: 0, atmosphere: 0, difficulty: 0, total_ratings: 0, slots_played: roomSlotIds.length }
 
     const avg = (key: keyof typeof roomRatings[0]) =>
       Math.round((roomRatings.reduce((s, r) => s + (r[key] as number), 0) / n) * 10) / 10
@@ -36,13 +35,11 @@ async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: 
     const story_theme = avg('story_theme')
     const atmosphere = avg('atmosphere')
     const difficulty = avg('difficulty')
-    const game_master = avg('game_master')
-    const overall = Math.round(((puzzles + story_theme + atmosphere + difficulty + game_master) / 5) * 10) / 10
+    const overall = Math.round((puzzles + story_theme + atmosphere + difficulty) * 10) / 10
 
-    return { room, overall, puzzles, story_theme, atmosphere, difficulty, game_master, total_ratings: n, slots_played: roomSlotIds.length }
+    return { room, overall, puzzles, story_theme, atmosphere, difficulty, total_ratings: n, slots_played: roomSlotIds.length }
   })
 
-  // Stats
   const ratedSlotIds = new Set((ratings ?? []).map(r => r.game_slot_id))
   const totalSessions = (slots ?? []).filter(s => ratedSlotIds.has(s.id)).length
   const totalRooms = rankings.filter(r => r.total_ratings > 0).length

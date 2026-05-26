@@ -11,7 +11,7 @@ function formatPost(rankings: RoomRanking[], notes: string[], intro: string): st
     const rank = total - i
     lines.push(`מקום ${rank} — ${r.room.name}`)
     lines.push(`${r.room.company}, ${r.room.city} | ${r.room.time_limit} דקות`)
-    lines.push(`ציון כולל: ${r.overall.toFixed(1)} | פאזלים: ${r.puzzles} | סיפור: ${r.story_theme} | אווירה: ${r.atmosphere} | קושי: ${r.difficulty} | מנחה: ${r.game_master}`)
+    lines.push(`ציון כולל: ${r.overall.toFixed(1)}/40 | פאזלים: ${r.puzzles} | סיפור: ${r.story_theme} | אווירה: ${r.atmosphere} | קושי: ${r.difficulty}`)
     if (notes[i]?.trim()) lines.push(notes[i].trim())
     lines.push('')
   })
@@ -73,16 +73,18 @@ export default function ShareEditor({ rankings }: { rankings: RoomRanking[] }) {
                   {r.room.company} · {r.room.city} · {r.room.time_limit} דקות
                 </p>
               </div>
-              <span className="text-2xl font-bold text-orange-400 shrink-0">{r.overall.toFixed(1)}</span>
+              <div className="shrink-0 text-right">
+                <span className="text-3xl font-bold text-orange-400">{r.overall.toFixed(1)}</span>
+                <span className="text-lg font-semibold text-orange-700">/40</span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-1.5 mb-3">
+            <div className="grid grid-cols-4 gap-1.5 mb-3">
               {[
                 { label: 'פאזלים', val: r.puzzles },
                 { label: 'סיפור', val: r.story_theme },
                 { label: 'אווירה', val: r.atmosphere },
                 { label: 'קושי', val: r.difficulty },
-                { label: 'מנחה', val: r.game_master },
               ].map(({ label, val }) => (
                 <div key={label} className="bg-gray-800 rounded-lg p-2 text-center">
                   <div className="text-xs text-gray-500">{label}</div>

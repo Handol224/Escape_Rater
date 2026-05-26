@@ -11,7 +11,6 @@ interface RatingWithProfile {
   story_theme: number
   atmosphere: number
   difficulty: number
-  game_master: number
   comment: string | null
   profiles: { username: string }
 }
@@ -58,7 +57,7 @@ export default function RatingsPanel({ slots }: { slots: SlotWithRatings[] }) {
                     {slot.ratings.map(r => (
                       <div key={r.id} className="bg-gray-800 rounded-xl p-4">
                         <div className="font-medium text-orange-400 mb-3">{r.profiles?.username}</div>
-                        <div className="grid grid-cols-5 gap-2 mb-3">
+                        <div className="grid grid-cols-4 gap-2 mb-3">
                           {RATING_CATEGORIES.map(({ key, label }) => (
                             <div key={key} className="text-center bg-gray-700 rounded-lg p-2">
                               <div className="text-xs text-gray-400 mb-1">{label.split(' ')[0]}</div>
@@ -67,9 +66,9 @@ export default function RatingsPanel({ slots }: { slots: SlotWithRatings[] }) {
                           ))}
                         </div>
                         <div className="text-sm text-gray-300 font-medium">
-                          Overall:{' '}
+                          Total:{' '}
                           <span className="text-orange-400">
-                            {((r.puzzles + r.story_theme + r.atmosphere + r.difficulty + r.game_master) / 5).toFixed(1)}
+                            {r.puzzles + r.story_theme + r.atmosphere + r.difficulty}/40
                           </span>
                         </div>
                         {r.comment && (

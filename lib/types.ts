@@ -11,7 +11,7 @@ export interface EscapeRoom {
   name: string
   city: string
   company: string
-  time_limit: number // minutes
+  time_limit: number
   created_at: string
 }
 
@@ -41,12 +41,11 @@ export interface Rating {
 
 export interface RoomRanking {
   room: EscapeRoom
-  overall: number
+  overall: number // sum of 4 categories, max 40
   puzzles: number
   story_theme: number
   atmosphere: number
   difficulty: number
-  game_master: number
   total_ratings: number
   slots_played: number
 }
@@ -57,7 +56,6 @@ export type SortKey =
   | 'story_theme'
   | 'atmosphere'
   | 'difficulty'
-  | 'game_master'
   | 'time_limit'
 
 export const SORT_LABELS: Record<SortKey, string> = {
@@ -66,14 +64,12 @@ export const SORT_LABELS: Record<SortKey, string> = {
   story_theme: 'Story & Theme',
   atmosphere: 'Atmosphere',
   difficulty: 'Difficulty',
-  game_master: 'Game Master',
   time_limit: 'Time Played',
 }
 
-export const RATING_CATEGORIES: { key: keyof Omit<Rating, 'id' | 'game_slot_id' | 'user_id' | 'comment' | 'created_at' | 'updated_at' | 'profiles'>; label: string }[] = [
+export const RATING_CATEGORIES: { key: 'puzzles' | 'story_theme' | 'atmosphere' | 'difficulty'; label: string }[] = [
   { key: 'puzzles', label: 'Puzzles' },
   { key: 'story_theme', label: 'Story & Theme' },
   { key: 'atmosphere', label: 'Atmosphere' },
   { key: 'difficulty', label: 'Difficulty' },
-  { key: 'game_master', label: 'Game Master' },
 ]
