@@ -110,7 +110,10 @@ function SlotCard({
             {slot.escape_rooms?.company} · {slot.escape_rooms?.city}
           </p>
           <p className="text-gray-500 text-xs mt-1">
-            {format(new Date(slot.played_at), 'PPP · p')} · {slot.escape_rooms?.time_limit} min
+            {new Date(slot.played_at).getFullYear() === 2000
+              ? 'Backlog'
+              : format(new Date(slot.played_at), 'PPP · p')
+            } · {slot.escape_rooms?.time_limit} min
           </p>
         </div>
 

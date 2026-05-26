@@ -12,6 +12,7 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
   const [roomId, setRoomId] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
+  const [isBacklog, setIsBacklog] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,9 +21,11 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
     setError('')
     setLoading(true)
 
-    const playedAt = new Date(`${date}T${time}`).toISOString()
-    const supabase = createClient()
+    const playedAt = isBacklog
+      ? new Date('2000-01-01').toISOString()
+      : new Date(`${date}T${time}`).toISOString()
 
+    const supabase = createClient()
     const { error } = await supabase
       .from('game_slots')
       .insert({ escape_room_id: roomId, played_at: playedAt })
@@ -37,6 +40,7 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
     setRoomId('')
     setDate('')
     setTime('')
+    setIsBacklog(false)
     router.refresh()
   }
 
@@ -59,7 +63,7 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1">Escape Room</label>
               <select
@@ -75,30 +79,43 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Time</label>
-              <input
-                type="time"
-                value={time}
-                onChange={e => setTime(e.target.value)}
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
-              />
-            </div>
+            {!isBacklog && (
+              <>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Time</label>
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={e => setTime(e.target.value)}
+                    required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="flex gap-3 mt-4">
+          <label className="flex items-center gap-2 cursor-pointer mb-4">
+            <input
+              type="checkbox"
+              checked={isBacklog}
+              onChange={e => setIsBacklog(e.target.checked)}
+              className="w-4 h-4 accent-orange-500"
+            />
+            <span className="text-sm text-gray-400">Backlog — no specific date</span>
+          </label>
+
+          <div className="flex gap-3">
             <button
               type="submit"
               disabled={loading}
