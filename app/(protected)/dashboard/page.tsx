@@ -35,7 +35,7 @@ async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: 
     const story_theme = avg('story_theme')
     const atmosphere = avg('atmosphere')
     const difficulty = avg('difficulty')
-    const overall = Math.round((puzzles + story_theme + atmosphere + difficulty) * 10) / 10
+    const overall = Math.round(((puzzles + story_theme + atmosphere + difficulty) / 4) * 10) / 10
 
     return { room, overall, puzzles, story_theme, atmosphere, difficulty, total_ratings: n, slots_played: roomSlotIds.length }
   })

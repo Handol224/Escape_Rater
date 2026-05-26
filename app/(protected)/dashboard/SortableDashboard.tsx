@@ -16,8 +16,8 @@ const CATEGORY_KEYS: CategoryKey[] = ['puzzles', 'story_theme', 'atmosphere', 'd
 function OverallBadge({ value, highlight }: { value: number; highlight?: boolean }) {
   const color = highlight
     ? 'text-orange-400'
-    : value >= 32 ? 'text-green-400'
-    : value >= 24 ? 'text-yellow-400'
+    : value >= 8 ? 'text-green-400'
+    : value >= 6 ? 'text-yellow-400'
     : value > 0  ? 'text-red-400'
     : 'text-gray-600'
   return (

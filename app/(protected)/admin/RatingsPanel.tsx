@@ -66,9 +66,9 @@ export default function RatingsPanel({ slots }: { slots: SlotWithRatings[] }) {
                           ))}
                         </div>
                         <div className="text-sm text-gray-300 font-medium">
-                          Total:{' '}
+                          Overall:{' '}
                           <span className="text-orange-400">
-                            {r.puzzles + r.story_theme + r.atmosphere + r.difficulty}/40
+                            {((r.puzzles + r.story_theme + r.atmosphere + r.difficulty) / 4).toFixed(1)}
                           </span>
                         </div>
                         {r.comment && (

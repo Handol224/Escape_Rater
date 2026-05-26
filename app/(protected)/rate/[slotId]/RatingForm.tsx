@@ -63,7 +63,9 @@ export default function RatingForm({ slotId, userId, existing }: Props) {
   const [done, setDone] = useState(false)
 
   const allScored = Object.values(scores).every(v => v > 0)
-  const total = allScored ? Object.values(scores).reduce((s, v) => s + v, 0) : null
+  const total = allScored
+    ? (Object.values(scores).reduce((s, v) => s + v, 0) / 4).toFixed(1)
+    : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
