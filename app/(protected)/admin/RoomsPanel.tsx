@@ -14,6 +14,16 @@ export default function RoomsPanel({ rooms }: { rooms: EscapeRoom[] }) {
   const [rows, setRows] = useState<RoomRow[]>([emptyRow()])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  async function deleteRoom(id: string, name: string) {
+    if (!confirm(`Delete "${name}" and all its sessions and ratings?`)) return
+    setDeleting(id)
+    const supabase = createClient()
+    await supabase.from('escape_rooms').delete().eq('id', id)
+    router.refresh()
+    setDeleting(null)
+  }
 
   function updateRow(i: number, field: keyof RoomRow, value: string) {
     setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
@@ -171,7 +181,16 @@ export default function RoomsPanel({ rooms }: { rooms: EscapeRoom[] }) {
                   <span className="text-white font-medium">{r.name}</span>
                   <span className="text-gray-500 text-sm ml-2">· {r.company} · {r.city}</span>
                 </div>
-                <span className="text-gray-500 text-sm">{r.time_limit} min</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500 text-sm">{r.time_limit} min</span>
+                  <button
+                    onClick={() => deleteRoom(r.id, r.name)}
+                    disabled={deleting === r.id}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    {deleting === r.id ? '…' : 'Delete'}
+                  </button>
+                </div>
               </div>
             </div>
           ))}

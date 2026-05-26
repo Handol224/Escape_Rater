@@ -19,6 +19,7 @@ export interface GameSlot {
   id: string
   escape_room_id: string
   played_at: string
+  escaped: boolean | null
   created_at: string
   escape_rooms?: EscapeRoom
 }
