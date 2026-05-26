@@ -26,7 +26,7 @@ export default async function CalendarPage() {
 
   const { data: rooms } = await supabase
     .from('escape_rooms')
-    .select('id, name')
+    .select('id, name, city, company')
     .order('name')
 
   const typedSlots = (slots ?? []) as SlotWithDetails[]

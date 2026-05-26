@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-interface Room { id: string; name: string }
+interface Room { id: string; name: string; city: string; company: string }
 
 export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
   const router = useRouter()
@@ -16,9 +16,56 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Combobox state
+  const [query, setQuery] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const comboboxRef = useRef<HTMLDivElement>(null)
+
+  const filtered = query.trim() === ''
+    ? rooms.slice(0, 8)
+    : rooms
+        .filter(r => r.name.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 8)
+
+  // Close dropdown on outside click or Escape
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  function selectRoom(room: Room) {
+    setRoomId(room.id)
+    setQuery(room.name)
+    setDropdownOpen(false)
+  }
+
+  function clearRoom() {
+    setRoomId('')
+    setQuery('')
+    setDropdownOpen(false)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (!roomId) {
+      setError('Please select a room.')
+      return
+    }
+
     setLoading(true)
 
     const playedAt = isBacklog
@@ -38,6 +85,7 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
 
     setOpen(false)
     setRoomId('')
+    setQuery('')
     setDate('')
     setTime('')
     setIsBacklog(false)
@@ -64,19 +112,59 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {/* Combobox */}
             <div>
               <label className="block text-sm text-gray-400 mb-1">Escape Room</label>
-              <select
-                value={roomId}
-                onChange={e => setRoomId(e.target.value)}
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
-              >
-                <option value="">Select a room…</option>
-                {rooms.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
+              <div ref={comboboxRef} className="relative">
+                <input
+                  type="text"
+                  value={query}
+                  placeholder="Search rooms…"
+                  autoComplete="off"
+                  onChange={e => {
+                    setQuery(e.target.value)
+                    setRoomId('')
+                    setDropdownOpen(true)
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-8 text-white text-sm focus:outline-none focus:border-orange-500"
+                />
+                {roomId && (
+                  <button
+                    type="button"
+                    onClick={clearRoom}
+                    aria-label="Clear selection"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-base leading-none"
+                  >
+                    ×
+                  </button>
+                )}
+                {dropdownOpen && filtered.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                    {filtered.map(r => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onMouseDown={e => {
+                            // Use mousedown so it fires before the input's blur
+                            e.preventDefault()
+                            selectRoom(r)
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors"
+                        >
+                          <span className="block text-white text-sm">{r.name}</span>
+                          <span className="block text-gray-400 text-xs">{r.city} · {r.company}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {dropdownOpen && query.trim() !== '' && filtered.length === 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-500">
+                    No rooms found.
+                  </div>
+                )}
+              </div>
             </div>
 
             {!isBacklog && (

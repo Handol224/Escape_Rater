@@ -23,6 +23,7 @@ export default function Navbar({ username, isAdmin }: Props) {
   const links = [
     { href: '/dashboard', label: 'Rankings' },
     { href: '/calendar', label: 'Calendar' },
+    { href: '/trips', label: 'Trips' },
     { href: '/share', label: '📋 Post' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]
