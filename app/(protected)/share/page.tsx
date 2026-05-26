@@ -41,8 +41,8 @@ export default async function SharePage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Facebook Post</h1>
-        <p className="text-gray-400 text-sm mt-1">Rooms ordered worst to best. Add notes under each one, then copy.</p>
+        <h1 className="text-2xl font-bold text-white">פוסט לפייסבוק</h1>
+        <p className="text-gray-400 text-sm mt-1">החדרים מסודרים מהגרוע לטוב. הוסיפו הערות ואז העתיקו.</p>
       </div>
       <ShareEditor rankings={sorted} />
     </div>
