@@ -306,7 +306,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
             return (
               <div
                 key={r.room.id}
-                className={`bg-gray-900 rounded-xl border ${isTopOverall ? 'border-orange-600/60' : 'border-gray-800'}`}
+                className={`bg-gray-900 rounded-xl border overflow-hidden ${isTopOverall ? 'border-orange-600/60' : 'border-gray-800'}`}
               >
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-4">
