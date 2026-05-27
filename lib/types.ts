@@ -48,6 +48,7 @@ export interface RoomRanking {
   difficulty: number
   total_ratings: number
   slots_played: number
+  escaped_count: number
 }
 
 export type SortKey =

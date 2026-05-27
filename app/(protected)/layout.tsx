@@ -18,7 +18,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <Navbar username={profile.username} isAdmin={profile.is_admin} />
+      <Navbar username={profile.username} userId={user.id} isAdmin={profile.is_admin} />
       <main className="max-w-5xl mx-auto px-4 py-8">
         {children}
       </main>

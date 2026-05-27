@@ -1,29 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { usePathname } from 'next/navigation'
+import AccountMenu from '@/app/components/AccountMenu'
 
 interface Props {
   username: string
+  userId: string
   isAdmin: boolean
 }
 
-export default function Navbar({ username, isAdmin }: Props) {
+export default function Navbar({ username, userId, isAdmin }: Props) {
   const pathname = usePathname()
-  const router = useRouter()
-
-  async function signOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
 
   const links = [
     { href: '/dashboard', label: 'Rankings' },
     { href: '/calendar', label: 'Calendar' },
     { href: '/trips', label: 'Trips' },
+    { href: '/stats', label: 'Stats' },
     { href: '/share', label: '📋 Post' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]
@@ -51,15 +45,7 @@ export default function Navbar({ username, isAdmin }: Props) {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-gray-400 text-sm">{username}</span>
-          <button
-            onClick={signOut}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
+        <AccountMenu username={username} userId={userId} />
       </div>
     </nav>
   )

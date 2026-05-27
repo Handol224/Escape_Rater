@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { RoomRanking, SortKey } from '@/lib/types'
 import type { Stats } from './page'
 
@@ -40,6 +41,11 @@ function CategoryBadge({ value, highlight }: { value: number; highlight?: boolea
 export default function SortableDashboard({ rankings, sortLabels, stats }: Props) {
   const [sort, setSort] = useState<SortKey>('overall')
   const [search, setSearch] = useState('')
+  const [cityFilter, setCityFilter] = useState('')
+  const [companyFilter, setCompanyFilter] = useState('')
+
+  const cities = [...new Set(rankings.map(r => r.room.city))].sort()
+  const companies = [...new Set(rankings.map(r => r.room.company))].sort()
 
   const sorted = [...rankings].sort((a, b) => {
     if (sort === 'time_limit') return a.room.time_limit - b.room.time_limit
@@ -47,13 +53,12 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
   })
 
   const filtered = sorted.filter(r => {
-    if (!search) return true
+    if (!search && !cityFilter && !companyFilter) return true
     const q = search.toLowerCase()
-    return (
-      r.room.name.toLowerCase().includes(q) ||
-      r.room.city.toLowerCase().includes(q) ||
-      r.room.company.toLowerCase().includes(q)
-    )
+    const matchesSearch = !search || r.room.name.toLowerCase().includes(q) || r.room.city.toLowerCase().includes(q) || r.room.company.toLowerCase().includes(q)
+    const matchesCity = !cityFilter || r.room.city === cityFilter
+    const matchesCompany = !companyFilter || r.room.company === companyFilter
+    return matchesSearch && matchesCity && matchesCompany
   })
 
   const ratedRankings = rankings.filter(r => r.total_ratings > 0)
@@ -87,8 +92,26 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search by name, city, or company…"
-        className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 mb-4"
+        className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 mb-3"
       />
+      <div className="flex gap-3 mb-4">
+        <select
+          value={cityFilter}
+          onChange={e => setCityFilter(e.target.value)}
+          className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500 flex-1"
+        >
+          <option value="">All cities</option>
+          {cities.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select
+          value={companyFilter}
+          onChange={e => setCompanyFilter(e.target.value)}
+          className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500 flex-1"
+        >
+          <option value="">All companies</option>
+          {companies.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
         {(Object.keys(sortLabels) as SortKey[]).map(key => (
@@ -108,7 +131,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
 
       {filtered.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
-          {search ? 'No rooms match your search.' : 'No escape rooms yet. Admin will add them!'}
+          {(search || cityFilter || companyFilter) ? 'No rooms match your filters.' : 'No escape rooms yet. Admin will add them!'}
         </div>
       ) : (
         <div className="space-y-3">
@@ -127,7 +150,9 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
                     <span className="text-2xl font-bold text-gray-600 w-8 shrink-0 pt-0.5">{i + 1}</span>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-white text-lg leading-tight">{r.room.name}</h3>
+                        <Link href={`/rooms/${r.room.id}`} className="hover:text-orange-400 transition-colors">
+                          <h3 className="font-semibold text-white text-lg leading-tight">{r.room.name}</h3>
+                        </Link>
                         {isTopOverall && <span className="text-xs bg-orange-900/40 text-orange-400 px-2 py-0.5 rounded-full">#1 overall</span>}
                         {!isTopOverall && isTopInSort && r.total_ratings > 0 && (
                           <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-0.5 rounded-full">
