@@ -21,12 +21,14 @@ export default async function DashboardPage() {
     { data: ratings },
     { data: userRatingsRaw },
     { data: backlogSlotsRaw },
+    { data: userPlayedRaw },
   ] = await Promise.all([
     supabase.from('escape_rooms').select('*').order('created_at'),
     supabase.from('game_slots').select('id, escape_room_id, escaped'),
     supabase.from('ratings').select('game_slot_id, puzzles, story_theme, atmosphere, difficulty'),
     supabase.from('ratings').select('game_slot_id, game_slots(escape_room_id)').eq('user_id', user.id),
     supabase.from('game_slots').select('id, escape_room_id').lt('played_at', '2001-01-01'),
+    supabase.from('user_played_rooms').select('id, room_id').eq('user_id', user.id),
   ])
 
   if (!rooms?.length) {
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
           currentUserId={user.id}
           backlogSlotsByRoom={{}}
           userRatedSlotByRoom={{}}
+          playedByRoom={{}}
         />
       </div>
     )
@@ -91,6 +94,12 @@ export default async function DashboardPage() {
     if (roomId) userRatedSlotByRoom[roomId] = r.game_slot_id
   }
 
+  // playedByRoom: roomId → user_played_rooms.id (for deletion)
+  const playedByRoom: Record<string, string> = {}
+  for (const p of (userPlayedRaw ?? [])) {
+    playedByRoom[p.room_id] = p.id
+  }
+
   const stats: Stats = { totalSessions, totalRooms, avgScore }
 
   return (
@@ -106,6 +115,7 @@ export default async function DashboardPage() {
         currentUserId={user.id}
         backlogSlotsByRoom={backlogSlotsByRoom}
         userRatedSlotByRoom={userRatedSlotByRoom}
+        playedByRoom={playedByRoom}
       />
     </div>
   )

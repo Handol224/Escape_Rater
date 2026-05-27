@@ -14,6 +14,7 @@ interface Props {
   currentUserId: string
   backlogSlotsByRoom: Record<string, string>
   userRatedSlotByRoom: Record<string, string>
+  playedByRoom: Record<string, string>   // roomId → user_played_rooms.id
 }
 
 type CategoryKey = 'puzzles' | 'story_theme' | 'atmosphere' | 'difficulty'
@@ -49,12 +50,19 @@ interface RateModalProps {
   rankings: RoomRanking[]
   backlogSlotsByRoom: Record<string, string>
   userRatedSlotByRoom: Record<string, string>
+  localPlayedByRoom: Record<string, string>
   onClose: () => void
-  onCreateSlot: (roomId: string) => Promise<void>
-  creatingSlotFor: string | null
+  onMarkPlayed: (roomId: string) => Promise<void>
+  onUnmarkPlayed: (roomId: string) => Promise<void>
+  onRate: (roomId: string) => Promise<void>
+  markingPlayedFor: string | null
+  ratingFor: string | null
 }
 
-function RateRoomModal({ rankings, backlogSlotsByRoom, userRatedSlotByRoom, onClose, onCreateSlot, creatingSlotFor }: RateModalProps) {
+function RateRoomModal({
+  rankings, backlogSlotsByRoom, userRatedSlotByRoom, localPlayedByRoom,
+  onClose, onMarkPlayed, onUnmarkPlayed, onRate, markingPlayedFor, ratingFor,
+}: RateModalProps) {
   const [modalSearch, setModalSearch] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -109,40 +117,56 @@ function RateRoomModal({ rankings, backlogSlotsByRoom, userRatedSlotByRoom, onCl
             <p className="text-gray-500 text-sm text-center py-6">No rooms found.</p>
           ) : (
             filtered.map(r => {
-              const existingSlotId = userRatedSlotByRoom[r.room.id]
+              const ratedSlotId = userRatedSlotByRoom[r.room.id]
               const backlogSlotId = backlogSlotsByRoom[r.room.id]
-              const isCreating = creatingSlotFor === r.room.id
+              const isPlayed = !!localPlayedByRoom[r.room.id]
+              const isMarking = markingPlayedFor === r.room.id
+              const isRating = ratingFor === r.room.id
 
               return (
-                <div
-                  key={r.room.id}
-                  className="flex items-center justify-between gap-3 bg-gray-800 rounded-xl px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-white font-medium truncate">{r.room.name}</p>
-                    <p className="text-gray-400 text-xs">{r.room.company} · {r.room.city}</p>
+                <div key={r.room.id} className="bg-gray-800 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-medium truncate">{r.room.name}</p>
+                      <p className="text-gray-400 text-xs">{r.room.company} · {r.room.city}</p>
+                    </div>
+                    {r.overall > 0 && (
+                      <span className="text-sm font-bold tabular-nums text-gray-400 shrink-0">{r.overall.toFixed(1)}</span>
+                    )}
                   </div>
-                  {existingSlotId ? (
+                  {/* Action bar */}
+                  {ratedSlotId ? (
                     <Link
-                      href={`/rate/${existingSlotId}`}
-                      className="shrink-0 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-1.5 rounded-lg transition-colors font-medium"
+                      href={`/rate/${ratedSlotId}`}
+                      className="flex items-center justify-center gap-1.5 w-full py-2 text-xs font-medium text-gray-400 hover:text-white bg-gray-700/60 hover:bg-gray-700 transition-colors"
                     >
-                      Edit
+                      ✏️ Edit rating
                     </Link>
-                  ) : backlogSlotId ? (
-                    <Link
-                      href={`/rate/${backlogSlotId}`}
-                      className="shrink-0 text-sm bg-orange-600 hover:bg-orange-500 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
-                    >
-                      Rate
-                    </Link>
+                  ) : isPlayed ? (
+                    <div className="flex">
+                      <div className="flex-1 flex items-center justify-between px-3 py-2 bg-green-900/40">
+                        <span className="text-green-400 text-xs font-medium flex items-center gap-1">✓ Played</span>
+                        <button
+                          onClick={() => onUnmarkPlayed(r.room.id)}
+                          className="text-gray-600 hover:text-red-400 transition-colors text-xs ml-2"
+                          title="Remove played"
+                        >✕</button>
+                      </div>
+                      <button
+                        onClick={() => { onRate(r.room.id); onClose() }}
+                        disabled={isRating}
+                        className="flex items-center justify-center gap-1 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+                      >
+                        {isRating ? '…' : (backlogSlotId ? 'Rate →' : 'Rate →')}
+                      </button>
+                    </div>
                   ) : (
                     <button
-                      onClick={() => onCreateSlot(r.room.id)}
-                      disabled={isCreating}
-                      className="shrink-0 text-sm bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
+                      onClick={() => onMarkPlayed(r.room.id)}
+                      disabled={isMarking}
+                      className="flex items-center justify-center gap-1.5 w-full py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-500 disabled:opacity-50 transition-colors"
                     >
-                      {isCreating ? '…' : 'Rate'}
+                      {isMarking ? '…' : '★ Mark as Played'}
                     </button>
                   )}
                 </div>
@@ -157,17 +181,55 @@ function RateRoomModal({ rankings, backlogSlotsByRoom, userRatedSlotByRoom, onCl
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function SortableDashboard({ rankings, sortLabels, stats, currentUserId, backlogSlotsByRoom, userRatedSlotByRoom }: Props) {
+export default function SortableDashboard({ rankings, sortLabels, stats, currentUserId, backlogSlotsByRoom, userRatedSlotByRoom, playedByRoom }: Props) {
   const router = useRouter()
   const [sort, setSort] = useState<SortKey>('overall')
   const [search, setSearch] = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
-  const [creatingSlotFor, setCreatingSlotFor] = useState<string | null>(null)
   const [showRateModal, setShowRateModal] = useState(false)
 
-  async function handleRateRoom(roomId: string) {
-    setCreatingSlotFor(roomId)
+  // Local mutable copies so UI updates instantly without a full page refresh
+  const [localPlayedByRoom, setLocalPlayedByRoom] = useState<Record<string, string>>(playedByRoom)
+  const [localBacklogSlots, setLocalBacklogSlots] = useState<Record<string, string>>(backlogSlotsByRoom)
+  const [markingPlayedFor, setMarkingPlayedFor] = useState<string | null>(null)
+  const [ratingFor, setRatingFor] = useState<string | null>(null)
+
+  async function handleMarkPlayed(roomId: string) {
+    setMarkingPlayedFor(roomId)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('user_played_rooms')
+      .insert({ user_id: currentUserId, room_id: roomId })
+      .select('id')
+      .single()
+    setMarkingPlayedFor(null)
+    if (error || !data) {
+      alert('Could not mark as played: ' + (error?.message ?? 'unknown error'))
+      return
+    }
+    setLocalPlayedByRoom(prev => ({ ...prev, [roomId]: data.id }))
+  }
+
+  async function handleUnmarkPlayed(roomId: string) {
+    const playedId = localPlayedByRoom[roomId]
+    if (!playedId) return
+    const supabase = createClient()
+    await supabase.from('user_played_rooms').delete().eq('id', playedId)
+    setLocalPlayedByRoom(prev => {
+      const next = { ...prev }
+      delete next[roomId]
+      return next
+    })
+  }
+
+  async function handleRate(roomId: string) {
+    const existingSlotId = localBacklogSlots[roomId]
+    if (existingSlotId) {
+      router.push(`/rate/${existingSlotId}`)
+      return
+    }
+    setRatingFor(roomId)
     const supabase = createClient()
     const { data, error } = await supabase
       .from('game_slots')
@@ -175,10 +237,11 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
       .select('id')
       .single()
     if (error || !data) {
-      setCreatingSlotFor(null)
+      setRatingFor(null)
       alert('Failed to create slot: ' + (error?.message ?? 'unknown error'))
       return
     }
+    setLocalBacklogSlots(prev => ({ ...prev, [roomId]: data.id }))
     router.push(`/rate/${data.id}`)
   }
 
@@ -214,11 +277,15 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
       {showRateModal && (
         <RateRoomModal
           rankings={rankings}
-          backlogSlotsByRoom={backlogSlotsByRoom}
+          backlogSlotsByRoom={localBacklogSlots}
           userRatedSlotByRoom={userRatedSlotByRoom}
+          localPlayedByRoom={localPlayedByRoom}
           onClose={() => setShowRateModal(false)}
-          onCreateSlot={handleRateRoom}
-          creatingSlotFor={creatingSlotFor}
+          onMarkPlayed={handleMarkPlayed}
+          onUnmarkPlayed={handleUnmarkPlayed}
+          onRate={handleRate}
+          markingPlayedFor={markingPlayedFor}
+          ratingFor={ratingFor}
         />
       )}
 
@@ -299,9 +366,10 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
             const isTopOverall = bestIn.overall === r.room.id
             const activeCategoryKey = sort as CategoryKey
             const isTopInSort = CATEGORY_KEYS.includes(activeCategoryKey) && bestIn[activeCategoryKey] === r.room.id
-            const existingSlotId = userRatedSlotByRoom[r.room.id]
-            const backlogSlotId = backlogSlotsByRoom[r.room.id]
-            const isCreating = creatingSlotFor === r.room.id
+            const ratedSlotId = userRatedSlotByRoom[r.room.id]
+            const isPlayed = !!localPlayedByRoom[r.room.id]
+            const isMarking = markingPlayedFor === r.room.id
+            const isRating = ratingFor === r.room.id
 
             return (
               <div
@@ -355,37 +423,55 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
                   </div>
                 </div>
 
-                {/* Rate / Edit Rating — full-width bottom button */}
-                {existingSlotId ? (
+                {/* ── Bottom action bar ── */}
+                {ratedSlotId ? (
+                  // State 3: already rated → edit
                   <Link
-                    href={`/rate/${existingSlotId}`}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-medium text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-800 rounded-b-xl transition-colors border-t border-gray-800"
+                    href={`/rate/${ratedSlotId}`}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-medium text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-800 transition-colors border-t border-gray-800"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     Edit your rating
                   </Link>
-                ) : backlogSlotId ? (
-                  <Link
-                    href={`/rate/${backlogSlotId}`}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 rounded-b-xl transition-colors border-t border-orange-700"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    Rate this room
-                  </Link>
+                ) : isPlayed ? (
+                  // State 2: marked as played → split bar
+                  <div className="flex border-t border-gray-800">
+                    <div className="flex-1 flex items-center justify-between px-4 py-2.5 bg-green-900/30 border-r border-gray-700">
+                      <span className="text-green-400 text-sm font-medium flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        Played
+                      </span>
+                      <button
+                        onClick={() => handleUnmarkPlayed(r.room.id)}
+                        title="Remove played"
+                        className="text-gray-600 hover:text-red-400 transition-colors text-xs px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleRate(r.room.id)}
+                      disabled={isRating}
+                      className="flex items-center justify-center gap-1.5 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:opacity-60 text-white text-sm font-semibold transition-colors"
+                    >
+                      {isRating ? '…' : '★ Rate'}
+                    </button>
+                  </div>
                 ) : (
+                  // State 1: not played yet → single orange bar
                   <button
-                    onClick={() => handleRateRoom(r.room.id)}
-                    disabled={isCreating}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 disabled:opacity-60 rounded-b-xl transition-colors border-t border-orange-700"
+                    onClick={() => handleMarkPlayed(r.room.id)}
+                    disabled={isMarking}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 disabled:opacity-60 transition-colors border-t border-orange-700"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                     </svg>
-                    {isCreating ? 'Opening…' : 'Rate this room'}
+                    {isMarking ? 'Saving…' : 'Mark as Played'}
                   </button>
                 )}
               </div>
