@@ -51,6 +51,11 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
     .select('id, escape_room_id, played_at, escape_rooms(name)')
     .order('played_at', { ascending: false })
 
+  const { data: rooms } = await supabase
+    .from('escape_rooms')
+    .select('id, name, city, company')
+    .order('name')
+
   return (
     <TripDetail
       trip={typedTrip}
@@ -58,6 +63,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
       isAdmin={isAdmin}
       isCreator={isCreator}
       existingSlots={(slots ?? []) as { id: string; escape_room_id: string; played_at: string; escape_rooms?: { name: string } }[]}
+      rooms={(rooms ?? []) as { id: string; name: string; city: string; company: string }[]}
     />
   )
 }

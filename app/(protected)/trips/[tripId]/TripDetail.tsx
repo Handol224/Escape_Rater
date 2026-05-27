@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import type { Trip, TripMember, TripRoom } from '@/lib/types'
+import TripAddSlotForm from './TripAddSlotForm'
 
 interface Props {
   trip: Trip & { trip_members: TripMember[]; trip_rooms: TripRoom[] }
@@ -12,6 +13,7 @@ interface Props {
   isAdmin: boolean
   isCreator: boolean
   existingSlots: { id: string; escape_room_id: string; played_at: string; escape_rooms?: { name: string } }[]
+  rooms: { id: string; name: string; city: string; company: string }[]
 }
 
 function formatDate(dateStr: string) {
@@ -38,7 +40,31 @@ function getCalendarGrid(year: number, month: number): Date[] {
   return days
 }
 
-export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, existingSlots }: Props) {
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() - d.getDay()) // Sunday
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function getWeekDays(date: Date): Date[] {
+  const start = getWeekStart(date)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    return d
+  })
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
+
+type TripCalView = 'month' | 'week' | 'day'
+
+export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, existingSlots, rooms }: Props) {
   const router = useRouter()
   const [tripData, setTripData] = useState(trip)
   const [shareUrl, setShareUrl] = useState('')
@@ -49,6 +75,7 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
     // Default to trip's start month
     return new Date(trip.start_date + 'T00:00:00')
   })
+  const [calView, setCalView] = useState<TripCalView>('month')
 
   useEffect(() => {
     if (tripData.is_locked) {
@@ -59,7 +86,7 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
   const isPastEndDate = new Date() >= new Date(tripData.end_date + 'T00:00:00')
 
   // Rooms that have a linked slot with a real date (not backlog)
-  const linkedRoomsByDate = new Map<string, { name: string; city: string }[]>()
+  const linkedRoomsByDate = new Map<string, { name: string; city: string; time: string }[]>()
 
   tripData.trip_rooms.forEach(tr => {
     if (!tr.game_slot_id) return
@@ -72,6 +99,7 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
     linkedRoomsByDate.get(key)!.push({
       name: (tr.escape_rooms as { name?: string })?.name ?? 'Unknown',
       city: (tr.escape_rooms as { city?: string })?.city ?? '',
+      time: format(slotDate, 'HH:mm'),
     })
   })
 
@@ -93,20 +121,6 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
     setError(null)
     const supabase = createClient()
     const { error: err } = await supabase.from('trip_rooms').delete().eq('id', tripRoomId)
-    if (err) {
-      setError(err.message)
-    } else {
-      router.refresh()
-    }
-  }
-
-  async function handleLinkSlot(tripRoomId: string, slotId: string | null) {
-    setError(null)
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('trip_rooms')
-      .update({ game_slot_id: slotId })
-      .eq('id', tripRoomId)
     if (err) {
       setError(err.message)
     } else {
@@ -247,15 +261,19 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
 
       {/* Rooms */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          Rooms ({tripData.trip_rooms.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Rooms ({tripData.trip_rooms.length})
+          </h2>
+          {isAdmin && !tripData.is_locked && (
+            <TripAddSlotForm tripId={tripData.id} rooms={rooms} userId={currentUserId} />
+          )}
+        </div>
 
         {tripData.trip_rooms.length > 0 && (
           <div className="space-y-3 mb-5">
             {tripData.trip_rooms.map(tr => {
               const room = tr.escape_rooms
-              const slotsForRoom = existingSlots.filter(s => s.escape_room_id === tr.escape_room_id)
 
               return (
                 <div key={tr.id} className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
@@ -266,24 +284,9 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
                     </p>
                   </div>
 
-                  {/* Slot linking */}
-                  <div className="shrink-0">
-                    <select
-                      value={tr.game_slot_id ?? ''}
-                      onChange={e => handleLinkSlot(tr.id, e.target.value || null)}
-                      className="bg-gray-700 border border-gray-600 text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-orange-500"
-                    >
-                      <option value="">Not linked</option>
-                      {slotsForRoom.map(slot => (
-                        <option key={slot.id} value={slot.id}>
-                          {format(new Date(slot.played_at), 'dd/MM/yy')}
-                        </option>
-                      ))}
-                    </select>
-                    {tr.game_slot_id && (
-                      <p className="text-xs text-green-400 mt-1 text-center">Played</p>
-                    )}
-                  </div>
+                  {tr.game_slot_id && (
+                    <span className="text-xs bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full shrink-0">✓ Played</span>
+                  )}
 
                   {(isCreator || isAdmin) && (
                     <button
@@ -303,70 +306,172 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
 
       {/* Calendar */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        {/* Month nav */}
-        <div className="flex items-center justify-between mb-5">
+        {/* Header with view selector and navigation */}
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Calendar</h2>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-              className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
-            >
-              ‹
-            </button>
-            <span className="text-white text-sm font-medium w-28 text-center">
-              {format(calendarDate, 'MMMM yyyy')}
+          <div className="flex items-center gap-2">
+            {/* View selector */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {(['month', 'week', 'day'] as TripCalView[]).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setCalView(v)}
+                  className={`px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                    calView === v ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            {/* Navigation arrows */}
+            <button type="button" onClick={() => {
+              if (calView === 'month') setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+              else if (calView === 'week') setCalendarDate(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
+              else setCalendarDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })
+            }} className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors">‹</button>
+            <span className="text-white text-sm font-medium w-32 text-center">
+              {calView === 'month' && format(calendarDate, 'MMMM yyyy')}
+              {calView === 'week' && (() => {
+                const start = getWeekStart(calendarDate)
+                const end = new Date(start); end.setDate(start.getDate() + 6)
+                return `${format(start, 'dd MMM')} – ${format(end, 'dd MMM')}`
+              })()}
+              {calView === 'day' && format(calendarDate, 'EEE dd MMM')}
             </span>
-            <button
-              type="button"
-              onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-              className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
-            >
-              ›
-            </button>
+            <button type="button" onClick={() => {
+              if (calView === 'month') setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+              else if (calView === 'week') setCalendarDate(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
+              else setCalendarDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })
+            }} className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors">›</button>
           </div>
         </div>
 
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-            <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
-          ))}
-        </div>
+        {/* Month view */}
+        {calView === 'month' && (
+          <div>
+            {/* Day headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
+              ))}
+            </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
-          {getCalendarGrid(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, idx) => {
-            const isCurrentMonth = day.getMonth() === calendarDate.getMonth()
-            const dateKey = day.toISOString().slice(0, 10)
-            const rooms = linkedRoomsByDate.get(dateKey) ?? []
-            const isToday = day.toDateString() === new Date().toDateString()
+            {/* Grid */}
+            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+              {getCalendarGrid(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, idx) => {
+                const isCurrentMonth = day.getMonth() === calendarDate.getMonth()
+                const dateKey = day.toISOString().slice(0, 10)
+                const rooms = linkedRoomsByDate.get(dateKey) ?? []
+                const isToday = isSameDay(day, new Date())
 
-            return (
-              <div
-                key={idx}
-                className={`bg-gray-900 min-h-[72px] p-1.5 ${!isCurrentMonth ? 'opacity-30' : ''}`}
-              >
-                <p className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                  isToday ? 'bg-orange-600 text-white' : 'text-gray-400'
-                }`}>
-                  {day.getDate()}
-                </p>
-                <div className="space-y-0.5">
-                  {rooms.map((r, i) => (
-                    <div
-                      key={i}
-                      className="bg-orange-900/40 text-orange-300 text-xs rounded px-1 py-0.5 truncate leading-tight"
-                      title={r.name}
+                return (
+                  <div
+                    key={idx}
+                    className={`bg-gray-900 min-h-[72px] p-1.5 ${!isCurrentMonth ? 'opacity-30' : ''}`}
+                  >
+                    <p className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer ${
+                      isToday ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                      onClick={() => { setCalView('day'); setCalendarDate(new Date(day)) }}
                     >
-                      {r.name}
+                      {day.getDate()}
+                    </p>
+                    <div className="space-y-0.5">
+                      {rooms.map((r, i) => (
+                        <div key={i} className="relative group">
+                          <div
+                            className="bg-orange-900/40 text-orange-300 text-xs rounded px-1 py-0.5 truncate leading-tight cursor-default"
+                            onClick={() => { setCalView('day'); setCalendarDate(new Date(day)) }}
+                          >
+                            {r.name}
+                          </div>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20">
+                            {r.time}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Week view */}
+        {calView === 'week' && (
+          <div>
+            <div className="grid grid-cols-7 mb-1">
+              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+              {getWeekDays(calendarDate).map((day, idx) => {
+                const dateKey = day.toISOString().slice(0, 10)
+                const rooms = linkedRoomsByDate.get(dateKey) ?? []
+                const isToday = isSameDay(day, new Date())
+                return (
+                  <div key={idx} className="bg-gray-900 min-h-[80px] p-1.5">
+                    <p
+                      className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer ${
+                        isToday ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                      onClick={() => { setCalView('day'); setCalendarDate(new Date(day)) }}
+                    >
+                      {day.getDate()}
+                    </p>
+                    <div className="space-y-0.5">
+                      {rooms.map((r, i) => (
+                        <div key={i} className="relative group">
+                          <div
+                            className="bg-orange-900/40 text-orange-300 text-xs rounded px-1 py-0.5 truncate leading-tight cursor-default"
+                            onClick={() => { setCalView('day'); setCalendarDate(new Date(day)) }}
+                          >
+                            {r.name}
+                          </div>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20">
+                            {r.time}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Day view */}
+        {calView === 'day' && (
+          <div>
+            {(() => {
+              const dateKey = calendarDate.toISOString().slice(0, 10)
+              const rooms = linkedRoomsByDate.get(dateKey) ?? []
+              if (rooms.length === 0) {
+                return <p className="text-gray-500 text-sm text-center py-8">No sessions on this day.</p>
+              }
+              return (
+                <div className="space-y-2">
+                  {rooms.map((r, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
+                      <div className="w-14 text-center shrink-0">
+                        <p className="text-orange-400 text-sm font-bold">{r.time}</p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{r.name}</p>
+                        {r.city && <p className="text-gray-400 text-xs mt-0.5">{r.city}</p>}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })()}
+          </div>
+        )}
       </div>
     </div>
   )
