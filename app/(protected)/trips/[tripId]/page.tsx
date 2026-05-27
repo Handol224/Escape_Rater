@@ -62,7 +62,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
       currentUserId={user.id}
       isAdmin={isAdmin}
       isCreator={isCreator}
-      existingSlots={(slots ?? []) as { id: string; escape_room_id: string; played_at: string; escape_rooms?: { name: string } }[]}
+      existingSlots={(slots ?? []) as unknown as { id: string; escape_room_id: string; played_at: string; escape_rooms?: { name: string } }[]}
       rooms={(rooms ?? []) as { id: string; name: string; city: string; company: string }[]}
     />
   )
