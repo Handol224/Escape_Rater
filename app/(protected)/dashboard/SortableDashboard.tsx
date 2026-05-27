@@ -73,12 +73,11 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
   return (
     <>
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {[
           { label: 'Sessions', value: stats.totalSessions.toString() },
           { label: 'Rooms rated', value: stats.totalRooms.toString() },
           { label: 'Avg score', value: stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '—' },
-          { label: 'Escape rate', value: stats.escapeRate !== null ? `${stats.escapeRate}%` : '—' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-white">{value}</div>

@@ -7,14 +7,13 @@ export interface Stats {
   totalSessions: number
   totalRooms: number
   avgScore: number
-  escapeRate: number | null
 }
 
 async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: Stats }> {
   const supabase = await createClient()
 
   const { data: rooms } = await supabase.from('escape_rooms').select('*').order('created_at')
-  if (!rooms?.length) return { rankings: [], stats: { totalSessions: 0, totalRooms: 0, avgScore: 0, escapeRate: null } }
+  if (!rooms?.length) return { rankings: [], stats: { totalSessions: 0, totalRooms: 0, avgScore: 0 } }
 
   const { data: slots } = await supabase.from('game_slots').select('id, escape_room_id, escaped')
   const { data: ratings } = await supabase
@@ -50,12 +49,8 @@ async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: 
     ? Math.round((scoredRooms.reduce((s, r) => s + r.overall, 0) / scoredRooms.length) * 10) / 10
     : 0
 
-  const slotsWithEscaped = (slots ?? []).filter(s => s.escaped !== null)
-  const escapeRate = slotsWithEscaped.length
-    ? Math.round((slotsWithEscaped.filter(s => s.escaped).length / slotsWithEscaped.length) * 100)
-    : null
 
-  return { rankings, stats: { totalSessions, totalRooms, avgScore, escapeRate } }
+  return { rankings, stats: { totalSessions, totalRooms, avgScore } }
 }
 
 export default async function DashboardPage() {

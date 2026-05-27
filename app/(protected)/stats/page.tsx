@@ -81,20 +81,6 @@ export default async function StatsPage() {
       ) / 10
     : 0
 
-  const escapedCount = myRatings.filter(
-    r => r.game_slots?.escaped === true
-  ).length
-
-  // Denominator: non-backlog slots with non-null escaped
-  const ratedNonBacklogWithEscapeData = myRatings.filter(
-    r => r.game_slots && !isBacklog(r.game_slots.played_at) && r.game_slots.escaped !== null
-  )
-  const myEscapeRate = ratedNonBacklogWithEscapeData.length > 0
-    ? Math.round(
-        ratedNonBacklogWithEscapeData.filter(r => r.game_slots.escaped === true).length /
-        ratedNonBacklogWithEscapeData.length * 100
-      )
-    : null
 
   const ratedSlotIds = new Set(myRatings.map(r => r.game_slot_id))
   const unratedSlots = allSlots.filter(
@@ -112,12 +98,10 @@ export default async function StatsPage() {
       </div>
 
       {/* Overview grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[
           { label: 'Rooms Rated', value: totalRated.toString() },
           { label: 'Avg Score', value: myAvgScore > 0 ? myAvgScore.toFixed(1) : '—' },
-          { label: 'Rooms Escaped', value: escapedCount.toString() },
-          { label: 'Escape Rate', value: myEscapeRate !== null ? `${myEscapeRate}%` : '—' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-white">{value}</div>
