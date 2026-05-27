@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
@@ -11,7 +11,6 @@ interface Props {
   currentUserId: string
   isAdmin: boolean
   isCreator: boolean
-  allRooms: { id: string; name: string; city: string; company: string }[]
   existingSlots: { id: string; escape_room_id: string; played_at: string; escape_rooms?: { name: string } }[]
 }
 
@@ -25,17 +24,31 @@ function formatTripName(trip: Trip) {
   return [trip.city, dateStr].filter(Boolean).join(' | ')
 }
 
-export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, allRooms, existingSlots }: Props) {
+function getCalendarGrid(year: number, month: number): Date[] {
+  const firstOfMonth = new Date(year, month, 1)
+  const startDay = firstOfMonth.getDay() // 0=Sun
+  const start = new Date(firstOfMonth)
+  start.setDate(start.getDate() - startDay)
+  const days: Date[] = []
+  const cur = new Date(start)
+  for (let i = 0; i < 42; i++) {
+    days.push(new Date(cur))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return days
+}
+
+export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, existingSlots }: Props) {
   const router = useRouter()
   const [tripData, setTripData] = useState(trip)
   const [shareUrl, setShareUrl] = useState('')
-  const [roomSearch, setRoomSearch] = useState('')
-  const [showRoomDropdown, setShowRoomDropdown] = useState(false)
-  const [addingRoom, setAddingRoom] = useState(false)
   const [locking, setLocking] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const searchRef = useRef<HTMLDivElement>(null)
+  const [calendarDate, setCalendarDate] = useState(() => {
+    // Default to trip's start month
+    return new Date(trip.start_date + 'T00:00:00')
+  })
 
   useEffect(() => {
     if (tripData.is_locked) {
@@ -43,25 +56,24 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, al
     }
   }, [tripData.is_locked, tripData.share_token])
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowRoomDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const isPastEndDate = new Date() >= new Date(tripData.end_date + 'T00:00:00')
 
-  const filteredRooms = roomSearch.trim().length > 0
-    ? allRooms.filter(r =>
-        r.name.toLowerCase().includes(roomSearch.toLowerCase()) &&
-        !tripData.trip_rooms.some(tr => tr.escape_room_id === r.id)
-      ).slice(0, 8)
-    : []
+  // Rooms that have a linked slot with a real date (not backlog)
+  const linkedRoomsByDate = new Map<string, { name: string; city: string }[]>()
+
+  tripData.trip_rooms.forEach(tr => {
+    if (!tr.game_slot_id) return
+    const slot = existingSlots.find(s => s.id === tr.game_slot_id)
+    if (!slot) return
+    const slotDate = new Date(slot.played_at)
+    if (slotDate.getFullYear() === 2000) return // skip backlog
+    const key = slotDate.toISOString().slice(0, 10) // "yyyy-mm-dd"
+    if (!linkedRoomsByDate.has(key)) linkedRoomsByDate.set(key, [])
+    linkedRoomsByDate.get(key)!.push({
+      name: (tr.escape_rooms as { name?: string })?.name ?? 'Unknown',
+      city: (tr.escape_rooms as { city?: string })?.city ?? '',
+    })
+  })
 
   async function copyToClipboard(text: string) {
     try {
@@ -75,29 +87,6 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, al
       document.execCommand('copy')
       document.body.removeChild(el)
     }
-  }
-
-  async function handleAddRoom(roomId: string) {
-    setAddingRoom(true)
-    setError(null)
-    const supabase = createClient()
-    const { error: err } = await supabase.from('trip_rooms').insert({
-      trip_id: tripData.id,
-      escape_room_id: roomId,
-      added_by: currentUserId,
-    })
-    if (err) {
-      if (err.code === '23505') {
-        setError('That room is already in this trip.')
-      } else {
-        setError(err.message)
-      }
-    } else {
-      setRoomSearch('')
-      setShowRoomDropdown(false)
-      router.refresh()
-    }
-    setAddingRoom(false)
   }
 
   async function handleRemoveRoom(tripRoomId: string) {
@@ -158,8 +147,6 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, al
       router.refresh()
     }
   }
-
-  const inviteLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/trips/join/${tripData.invite_token}`
 
   return (
     <div className="space-y-6">
@@ -298,7 +285,7 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, al
                     )}
                   </div>
 
-                  {isCreator && (
+                  {(isCreator || isAdmin) && (
                     <button
                       onClick={() => handleRemoveRoom(tr.id)}
                       className="shrink-0 text-gray-500 hover:text-red-400 transition-colors text-xs px-2 py-1 rounded"
@@ -312,43 +299,74 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, al
             })}
           </div>
         )}
+      </div>
 
-        {/* Add room search */}
-        {!tripData.is_locked && (
-          <div ref={searchRef} className="relative">
-            <input
-              type="text"
-              value={roomSearch}
-              onChange={e => {
-                setRoomSearch(e.target.value)
-                setShowRoomDropdown(true)
-              }}
-              onFocus={() => setShowRoomDropdown(true)}
-              placeholder="Search rooms to add..."
-              disabled={addingRoom}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500 disabled:opacity-60"
-            />
-            {showRoomDropdown && filteredRooms.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                {filteredRooms.map(room => (
-                  <button
-                    key={room.id}
-                    onClick={() => handleAddRoom(room.id)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-700 transition-colors"
-                  >
-                    <p className="text-white text-sm">{room.name}</p>
-                    <p className="text-gray-400 text-xs">{room.city} · {room.company}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-            {showRoomDropdown && roomSearch.trim().length > 0 && filteredRooms.length === 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-gray-500 text-sm z-10">
-                No rooms found
-              </div>
-            )}
+      {/* Calendar */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        {/* Month nav */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Calendar</h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+              className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
+            >
+              ‹
+            </button>
+            <span className="text-white text-sm font-medium w-28 text-center">
+              {format(calendarDate, 'MMMM yyyy')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+              className="text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
+            >
+              ›
+            </button>
           </div>
-        )}
+        </div>
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+            <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+          {getCalendarGrid(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, idx) => {
+            const isCurrentMonth = day.getMonth() === calendarDate.getMonth()
+            const dateKey = day.toISOString().slice(0, 10)
+            const rooms = linkedRoomsByDate.get(dateKey) ?? []
+            const isToday = day.toDateString() === new Date().toDateString()
+
+            return (
+              <div
+                key={idx}
+                className={`bg-gray-900 min-h-[72px] p-1.5 ${!isCurrentMonth ? 'opacity-30' : ''}`}
+              >
+                <p className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
+                  isToday ? 'bg-orange-600 text-white' : 'text-gray-400'
+                }`}>
+                  {day.getDate()}
+                </p>
+                <div className="space-y-0.5">
+                  {rooms.map((r, i) => (
+                    <div
+                      key={i}
+                      className="bg-orange-900/40 text-orange-300 text-xs rounded px-1 py-0.5 truncate leading-tight"
+                      title={r.name}
+                    >
+                      {r.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

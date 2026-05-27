@@ -29,6 +29,39 @@ export default async function CalendarPage() {
     .select('id, name, city, company')
     .order('name')
 
+  // Trips where user is creator
+  const { data: createdTrips } = await supabase
+    .from('trips')
+    .select('id, name, city, start_date, end_date')
+    .eq('creator_id', user!.id)
+    .eq('is_locked', false)
+
+  // Trips where user is a member (but not creator)
+  const { data: memberRows } = await supabase
+    .from('trip_members')
+    .select('trip_id')
+    .eq('user_id', user!.id)
+
+  const createdIds = new Set((createdTrips ?? []).map((t: { id: string }) => t.id))
+  const joinedTripIds = (memberRows ?? [])
+    .map((r: { trip_id: string }) => r.trip_id)
+    .filter((id: string) => !createdIds.has(id))
+
+  let joinedTrips: { id: string; name: string | null; city: string | null; start_date: string; end_date: string }[] = []
+  if (joinedTripIds.length > 0) {
+    const { data } = await supabase
+      .from('trips')
+      .select('id, name, city, start_date, end_date')
+      .in('id', joinedTripIds)
+      .eq('is_locked', false)
+    joinedTrips = (data ?? []) as typeof joinedTrips
+  }
+
+  const activeTrips = [
+    ...(createdTrips ?? []),
+    ...joinedTrips,
+  ] as { id: string; name: string | null; city: string | null; start_date: string; end_date: string }[]
+
   const typedSlots = (slots ?? []) as SlotWithDetails[]
   const isBacklog = (s: SlotWithDetails) => new Date(s.played_at).getFullYear() === 2000
   const upcoming = typedSlots.filter(s => !isBacklog(s) && !isPast(new Date(s.played_at)))
@@ -46,7 +79,9 @@ export default async function CalendarPage() {
         </div>
       </div>
 
-      {isAdmin && rooms && <AddSlotForm rooms={rooms} />}
+      {isAdmin && rooms && (
+        <AddSlotForm rooms={rooms} activeTrips={activeTrips} userId={user!.id} />
+      )}
 
       {upcoming.length > 0 && (
         <section className="mb-8">

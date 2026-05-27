@@ -4,9 +4,25 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+interface ActiveTrip {
+  id: string
+  name: string | null
+  city: string | null
+  start_date: string
+  end_date: string
+}
+
 interface Room { id: string; name: string; city: string; company: string }
 
-export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
+export default function AddSlotForm({
+  rooms,
+  activeTrips,
+  userId,
+}: {
+  rooms: Room[]
+  activeTrips: ActiveTrip[]
+  userId: string
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [roomId, setRoomId] = useState('')
@@ -15,6 +31,8 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
   const [isBacklog, setIsBacklog] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [tripId, setTripId] = useState('')
+  const [conflict, setConflict] = useState<{ tripRoomId: string; slotId: string } | null>(null)
 
   // Combobox state
   const [query, setQuery] = useState('')
@@ -57,15 +75,29 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
     setDropdownOpen(false)
   }
 
+  function tripLabel(t: ActiveTrip) {
+    if (t.name) return t.name
+    const start = t.start_date.slice(0, 10) // yyyy-mm-dd
+    const end = t.end_date.slice(0, 10)
+    return [t.city, `${start} – ${end}`].filter(Boolean).join(' | ')
+  }
+
+  function resetForm() {
+    setOpen(false)
+    setRoomId('')
+    setQuery('')
+    setDate('')
+    setTime('')
+    setIsBacklog(false)
+    setTripId('')
+    setConflict(null)
+    setLoading(false)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!roomId) { setError('Please select a room.'); return }
     setError('')
-
-    if (!roomId) {
-      setError('Please select a room.')
-      return
-    }
-
     setLoading(true)
 
     const playedAt = isBacklog
@@ -73,22 +105,68 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
       : new Date(`${date}T${time}`).toISOString()
 
     const supabase = createClient()
-    const { error } = await supabase
+
+    // Insert slot and get back the ID
+    const { data: insertedSlot, error: slotErr } = await supabase
       .from('game_slots')
       .insert({ escape_room_id: roomId, played_at: playedAt })
+      .select('id')
+      .single()
 
-    if (error) {
-      setError(error.message)
+    if (slotErr || !insertedSlot) {
+      setError(slotErr?.message ?? 'Failed to add slot')
       setLoading(false)
       return
     }
 
-    setOpen(false)
-    setRoomId('')
-    setQuery('')
-    setDate('')
-    setTime('')
-    setIsBacklog(false)
+    const newSlotId = insertedSlot.id
+
+    if (!tripId) {
+      // No trip selected — done
+      resetForm()
+      router.refresh()
+      return
+    }
+
+    // Check if room already in this trip
+    const { data: existingTripRoom } = await supabase
+      .from('trip_rooms')
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('escape_room_id', roomId)
+      .maybeSingle()
+
+    if (!existingTripRoom) {
+      // Add room to trip with slot linked
+      await supabase.from('trip_rooms').insert({
+        trip_id: tripId,
+        escape_room_id: roomId,
+        game_slot_id: newSlotId,
+        added_by: userId,
+      })
+      resetForm()
+      router.refresh()
+    } else {
+      // Conflict — ask user
+      setConflict({ tripRoomId: existingTripRoom.id, slotId: newSlotId })
+      setLoading(false)
+    }
+  }
+
+  async function handleLinkConflict() {
+    if (!conflict) return
+    setLoading(true)
+    const supabase = createClient()
+    await supabase
+      .from('trip_rooms')
+      .update({ game_slot_id: conflict.slotId })
+      .eq('id', conflict.tripRoomId)
+    resetForm()
+    router.refresh()
+  }
+
+  async function handleSkipConflict() {
+    resetForm()
     router.refresh()
   }
 
@@ -203,22 +281,62 @@ export default function AddSlotForm({ rooms }: { rooms: Room[] }) {
             <span className="text-sm text-gray-400">Backlog — no specific date</span>
           </label>
 
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              {loading ? 'Adding…' : 'Add Slot'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
+          {activeTrips.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-1">Trip <span className="text-gray-600">(optional)</span></label>
+              <select
+                value={tripId}
+                onChange={e => setTripId(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+              >
+                <option value="">No trip</option>
+                {activeTrips.map(t => (
+                  <option key={t.id} value={t.id}>{tripLabel(t)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {conflict ? (
+            <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-3 mt-2">
+              <p className="text-yellow-300 text-sm font-medium mb-3">
+                This room is already planned in the trip. Link this session to it?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleLinkConflict}
+                  className="bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  Link it
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkipConflict}
+                  className="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors"
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {loading ? 'Adding…' : 'Add Slot'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-gray-400 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </form>
       )}
     </div>

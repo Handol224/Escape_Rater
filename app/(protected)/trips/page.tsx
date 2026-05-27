@@ -68,24 +68,23 @@ export default async function TripsPage({ searchParams }: { searchParams: Promis
           <h1 className="text-2xl font-bold text-white">Trips</h1>
           <p className="text-gray-400 text-sm mt-1">Plan and share your escape room outings</p>
         </div>
-        <div className="relative group">
+        {canCreate ? (
           <Link
-            href={canCreate ? '/trips/new' : '#'}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              canCreate
-                ? 'bg-orange-600 hover:bg-orange-500 text-white'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-            }`}
-            onClick={e => !canCreate && e.preventDefault()}
+            href="/trips/new"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-500 text-white transition-colors"
           >
             + New Trip
           </Link>
-          {!canCreate && (
+        ) : (
+          <div className="relative group">
+            <span className="inline-block px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-500 cursor-not-allowed">
+              + New Trip
+            </span>
             <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg px-3 py-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
               Max 2 active trips
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {error === 'limit' && (
