@@ -3,6 +3,16 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 
+interface RatingRow {
+  id: string
+  puzzles: number
+  story_theme: number
+  atmosphere: number
+  difficulty: number
+  comment: string | null
+  profiles?: { username: string } | null
+}
+
 interface Props {
   params: Promise<{ roomId: string }>
 }
@@ -101,7 +111,7 @@ export default async function RoomDetailPage({ params }: Props) {
                 <span className="text-gray-500 text-sm">— Unknown</span>
               )
 
-            const ratings = slot.ratings ?? []
+            const ratings = (slot.ratings ?? []) as RatingRow[]
 
             return (
               <div

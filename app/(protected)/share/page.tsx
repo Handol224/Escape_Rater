@@ -18,7 +18,9 @@ async function getRankings(): Promise<RoomRanking[]> {
     const roomRatings = (ratings ?? []).filter(r => roomSlotIds.includes(r.game_slot_id))
     const n = roomRatings.length
 
-    if (n === 0) return { room, overall: 0, puzzles: 0, story_theme: 0, atmosphere: 0, difficulty: 0, game_master: 0, total_ratings: 0, slots_played: roomSlotIds.length }
+    const escapedCount = (slots ?? []).filter(s => s.escape_room_id === room.id && s.escaped === true).length
+
+    if (n === 0) return { room, overall: 0, puzzles: 0, story_theme: 0, atmosphere: 0, difficulty: 0, game_master: 0, total_ratings: 0, slots_played: roomSlotIds.length, escaped_count: escapedCount }
 
     const avg = (key: keyof typeof roomRatings[0]) =>
       Math.round((roomRatings.reduce((s, r) => s + (r[key] as number), 0) / n) * 10) / 10
@@ -30,7 +32,7 @@ async function getRankings(): Promise<RoomRanking[]> {
     const game_master = avg('game_master')
     const overall = Math.round(((puzzles + story_theme + atmosphere + difficulty + game_master) / 5) * 10) / 10
 
-    return { room, overall, puzzles, story_theme, atmosphere, difficulty, game_master, total_ratings: n, slots_played: roomSlotIds.length }
+    return { room, overall, puzzles, story_theme, atmosphere, difficulty, game_master, total_ratings: n, slots_played: roomSlotIds.length, escaped_count: escapedCount }
   }).filter(r => r.total_ratings > 0)
 }
 
