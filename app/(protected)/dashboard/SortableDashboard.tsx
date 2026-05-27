@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import type { RoomRanking, SortKey } from '@/lib/types'
 import type { Stats } from './page'
 
@@ -9,6 +11,9 @@ interface Props {
   rankings: RoomRanking[]
   sortLabels: Record<SortKey, string>
   stats: Stats
+  currentUserId: string
+  backlogSlotsByRoom: Record<string, string>
+  userRatedSlotByRoom: Record<string, string>
 }
 
 type CategoryKey = 'puzzles' | 'story_theme' | 'atmosphere' | 'difficulty'
@@ -38,11 +43,29 @@ function CategoryBadge({ value, highlight }: { value: number; highlight?: boolea
   return <span className={`font-bold tabular-nums ${color}`}>{value > 0 ? value.toFixed(1) : '—'}</span>
 }
 
-export default function SortableDashboard({ rankings, sortLabels, stats }: Props) {
+export default function SortableDashboard({ rankings, sortLabels, stats, currentUserId, backlogSlotsByRoom, userRatedSlotByRoom }: Props) {
+  const router = useRouter()
   const [sort, setSort] = useState<SortKey>('overall')
   const [search, setSearch] = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
+  const [creatingSlotFor, setCreatingSlotFor] = useState<string | null>(null)
+
+  async function handleRateRoom(roomId: string) {
+    setCreatingSlotFor(roomId)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('game_slots')
+      .insert({ escape_room_id: roomId, played_at: '2000-01-01T00:00:00Z', escaped: null })
+      .select('id')
+      .single()
+    if (error || !data) {
+      setCreatingSlotFor(null)
+      alert('Failed to create slot: ' + (error?.message ?? 'unknown error'))
+      return
+    }
+    router.push(`/rate/${data.id}`)
+  }
 
   const cities = [...new Set(rankings.map(r => r.room.city))].sort()
   const companies = [...new Set(rankings.map(r => r.room.company))].sort()
@@ -167,11 +190,46 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
                       </p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-3xl font-bold">
-                      <OverallBadge value={r.overall} highlight={isTopOverall} />
+                  <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                    <div>
+                      <div className="text-3xl font-bold">
+                        <OverallBadge value={r.overall} highlight={isTopOverall} />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">overall</div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">overall</div>
+                    {(() => {
+                      const existingSlotId = userRatedSlotByRoom[r.room.id]
+                      const backlogSlotId = backlogSlotsByRoom[r.room.id]
+                      if (existingSlotId) {
+                        return (
+                          <Link
+                            href={`/rate/${existingSlotId}`}
+                            className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Edit Rating
+                          </Link>
+                        )
+                      }
+                      if (backlogSlotId) {
+                        return (
+                          <Link
+                            href={`/rate/${backlogSlotId}`}
+                            className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Rate
+                          </Link>
+                        )
+                      }
+                      return (
+                        <button
+                          onClick={() => handleRateRoom(r.room.id)}
+                          disabled={creatingSlotFor === r.room.id}
+                          className="text-xs bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          {creatingSlotFor === r.room.id ? '…' : 'Rate'}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
 

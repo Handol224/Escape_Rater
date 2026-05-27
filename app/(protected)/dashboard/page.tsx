@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import type { EscapeRoom, RoomRanking } from '@/lib/types'
 import { SORT_LABELS } from '@/lib/types'
 import SortableDashboard from './SortableDashboard'
@@ -9,16 +10,44 @@ export interface Stats {
   avgScore: number
 }
 
-async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: Stats }> {
+export default async function DashboardPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  const { data: rooms } = await supabase.from('escape_rooms').select('*').order('created_at')
-  if (!rooms?.length) return { rankings: [], stats: { totalSessions: 0, totalRooms: 0, avgScore: 0 } }
+  const [
+    { data: rooms },
+    { data: slots },
+    { data: ratings },
+    { data: userRatingsRaw },
+    { data: backlogSlotsRaw },
+  ] = await Promise.all([
+    supabase.from('escape_rooms').select('*').order('created_at'),
+    supabase.from('game_slots').select('id, escape_room_id, escaped'),
+    supabase.from('ratings').select('game_slot_id, puzzles, story_theme, atmosphere, difficulty'),
+    supabase.from('ratings').select('game_slot_id, game_slots(escape_room_id)').eq('user_id', user.id),
+    supabase.from('game_slots').select('id, escape_room_id').lt('played_at', '2001-01-01'),
+  ])
 
-  const { data: slots } = await supabase.from('game_slots').select('id, escape_room_id, escaped')
-  const { data: ratings } = await supabase
-    .from('ratings')
-    .select('game_slot_id, puzzles, story_theme, atmosphere, difficulty')
+  if (!rooms?.length) {
+    const emptyStats: Stats = { totalSessions: 0, totalRooms: 0, avgScore: 0 }
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white">Rankings</h1>
+          <p className="text-gray-400 text-sm mt-1">All escape rooms ranked by your group&apos;s scores</p>
+        </div>
+        <SortableDashboard
+          rankings={[]}
+          sortLabels={SORT_LABELS}
+          stats={emptyStats}
+          currentUserId={user.id}
+          backlogSlotsByRoom={{}}
+          userRatedSlotByRoom={{}}
+        />
+      </div>
+    )
+  }
 
   const rankings: RoomRanking[] = rooms.map((room: EscapeRoom) => {
     const roomSlotIds = (slots ?? []).filter(s => s.escape_room_id === room.id).map(s => s.id)
@@ -49,12 +78,20 @@ async function getRankingsAndStats(): Promise<{ rankings: RoomRanking[]; stats: 
     ? Math.round((scoredRooms.reduce((s, r) => s + r.overall, 0) / scoredRooms.length) * 10) / 10
     : 0
 
+  // backlogSlotsByRoom: roomId → backlog slot id (year-2000 slots for rating without a trip)
+  const backlogSlotsByRoom: Record<string, string> = {}
+  for (const slot of (backlogSlotsRaw ?? [])) {
+    backlogSlotsByRoom[slot.escape_room_id] = slot.id
+  }
 
-  return { rankings, stats: { totalSessions, totalRooms, avgScore } }
-}
+  // userRatedSlotByRoom: roomId → slot id the user has already rated
+  const userRatedSlotByRoom: Record<string, string> = {}
+  for (const r of (userRatingsRaw ?? []) as unknown as { game_slot_id: string; game_slots: { escape_room_id: string } | null }[]) {
+    const roomId = r.game_slots?.escape_room_id
+    if (roomId) userRatedSlotByRoom[roomId] = r.game_slot_id
+  }
 
-export default async function DashboardPage() {
-  const { rankings, stats } = await getRankingsAndStats()
+  const stats: Stats = { totalSessions, totalRooms, avgScore }
 
   return (
     <div>
@@ -62,7 +99,14 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-white">Rankings</h1>
         <p className="text-gray-400 text-sm mt-1">All escape rooms ranked by your group&apos;s scores</p>
       </div>
-      <SortableDashboard rankings={rankings} sortLabels={SORT_LABELS} stats={stats} />
+      <SortableDashboard
+        rankings={rankings}
+        sortLabels={SORT_LABELS}
+        stats={stats}
+        currentUserId={user.id}
+        backlogSlotsByRoom={backlogSlotsByRoom}
+        userRatedSlotByRoom={userRatedSlotByRoom}
+      />
     </div>
   )
 }

@@ -17,7 +17,6 @@ export default function Navbar({ username, userId, isAdmin }: Props) {
 
   const links = [
     { href: '/dashboard', label: 'Rankings' },
-    { href: '/calendar', label: 'Calendar' },
     { href: '/trips', label: 'Trips' },
     { href: '/stats', label: 'Stats' },
     { href: '/share', label: '📋 Post' },
