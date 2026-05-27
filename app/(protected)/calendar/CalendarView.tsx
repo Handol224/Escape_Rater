@@ -280,14 +280,15 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
       {/* Month view */}
       {view === 'month' && (
         <div>
-          <div className="grid grid-cols-7 mb-1">
+          <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+          <div className="grid grid-cols-7 mb-1 min-w-[560px]">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="text-center text-xs text-gray-500 py-1">
                 {d}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+          <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden min-w-[560px]">
             {getCalendarGrid(currentDate.getFullYear(), currentDate.getMonth()).map((day, idx) => {
               const isCurrentMonth = day.getMonth() === currentDate.getMonth()
               const dateKey = day.toISOString().slice(0, 10)
@@ -327,20 +328,22 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
               )
             })}
           </div>
+          </div>
         </div>
       )}
 
       {/* Week view */}
       {view === 'week' && (
         <div>
-          <div className="grid grid-cols-7 mb-1">
+          <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+          <div className="grid grid-cols-7 mb-1 min-w-[560px]">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="text-center text-xs text-gray-500 py-1">
                 {d}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+          <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden min-w-[560px]">
             {getWeekDays(currentDate).map((day, idx) => {
               const dateKey = day.toISOString().slice(0, 10)
               const daySlots = slotsByDate.get(dateKey) ?? []
@@ -375,6 +378,7 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
                 </div>
               )
             })}
+          </div>
           </div>
         </div>
       )}

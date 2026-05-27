@@ -94,7 +94,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
         placeholder="Search by name, city, or company…"
         className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 mb-3"
       />
-      <div className="flex gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <select
           value={cityFilter}
           onChange={e => setCityFilter(e.target.value)}
@@ -176,7 +176,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats }: Props
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-4 gap-2">
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {CATEGORY_KEYS.map(key => (
                     <div
                       key={key}

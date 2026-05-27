@@ -351,15 +351,16 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
         {/* Month view */}
         {calView === 'month' && (
           <div>
+            <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
             {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
+            <div className="grid grid-cols-7 mb-1 min-w-[560px]">
               {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
                 <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
               ))}
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden min-w-[560px]">
               {getCalendarGrid(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, idx) => {
                 const isCurrentMonth = day.getMonth() === calendarDate.getMonth()
                 const dateKey = day.toISOString().slice(0, 10)
@@ -397,18 +398,20 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
                 )
               })}
             </div>
+            </div>
           </div>
         )}
 
         {/* Week view */}
         {calView === 'week' && (
           <div>
-            <div className="grid grid-cols-7 mb-1">
+            <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="grid grid-cols-7 mb-1 min-w-[560px]">
               {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
                 <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-gray-800 rounded-lg overflow-hidden min-w-[560px]">
               {getWeekDays(calendarDate).map((day, idx) => {
                 const dateKey = day.toISOString().slice(0, 10)
                 const rooms = linkedRoomsByDate.get(dateKey) ?? []
@@ -441,6 +444,7 @@ export default function TripDetail({ trip, currentUserId, isAdmin, isCreator, ex
                   </div>
                 )
               })}
+            </div>
             </div>
           </div>
         )}

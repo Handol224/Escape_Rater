@@ -150,7 +150,7 @@ export default async function RoomDetailPage({ params }: Props) {
                           )}
 
                           {/* Category scores */}
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {(
                               [
                                 { key: 'puzzles', label: 'Puzzles' },
