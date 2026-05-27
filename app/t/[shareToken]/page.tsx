@@ -44,7 +44,7 @@ export default async function PublicTripPage({ params }: { params: Promise<{ sha
     `${formatDate(trip.start_date)} – ${formatDate(trip.end_date)}`,
   ].filter(Boolean).join(' | ')
 
-  const rooms = (trip.trip_rooms ?? []) as {
+  const rooms = (trip.trip_rooms ?? []) as unknown as {
     id: string
     game_slot_id: string | null
     escape_rooms: { id: string; name: string; city: string; company: string } | null
