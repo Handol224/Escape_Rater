@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -43,6 +43,120 @@ function CategoryBadge({ value, highlight }: { value: number; highlight?: boolea
   return <span className={`font-bold tabular-nums ${color}`}>{value > 0 ? value.toFixed(1) : '—'}</span>
 }
 
+// ── Rate Room Modal ────────────────────────────────────────────────────────────
+
+interface RateModalProps {
+  rankings: RoomRanking[]
+  backlogSlotsByRoom: Record<string, string>
+  userRatedSlotByRoom: Record<string, string>
+  onClose: () => void
+  onCreateSlot: (roomId: string) => Promise<void>
+  creatingSlotFor: string | null
+}
+
+function RateRoomModal({ rankings, backlogSlotsByRoom, userRatedSlotByRoom, onClose, onCreateSlot, creatingSlotFor }: RateModalProps) {
+  const [modalSearch, setModalSearch] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const q = modalSearch.toLowerCase()
+  const filtered = rankings.filter(r =>
+    !modalSearch ||
+    r.room.name.toLowerCase().includes(q) ||
+    r.room.city.toLowerCase().includes(q) ||
+    r.room.company.toLowerCase().includes(q)
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md flex flex-col shadow-2xl max-h-[80vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+          <h2 className="text-white font-semibold text-lg">Rate a Room</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 pb-3 shrink-0">
+          <input
+            ref={inputRef}
+            type="text"
+            value={modalSearch}
+            onChange={e => setModalSearch(e.target.value)}
+            placeholder="Search rooms…"
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500"
+          />
+        </div>
+
+        {/* Room list */}
+        <div className="overflow-y-auto px-5 pb-5 space-y-2">
+          {filtered.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-6">No rooms found.</p>
+          ) : (
+            filtered.map(r => {
+              const existingSlotId = userRatedSlotByRoom[r.room.id]
+              const backlogSlotId = backlogSlotsByRoom[r.room.id]
+              const isCreating = creatingSlotFor === r.room.id
+
+              return (
+                <div
+                  key={r.room.id}
+                  className="flex items-center justify-between gap-3 bg-gray-800 rounded-xl px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-white font-medium truncate">{r.room.name}</p>
+                    <p className="text-gray-400 text-xs">{r.room.company} · {r.room.city}</p>
+                  </div>
+                  {existingSlotId ? (
+                    <Link
+                      href={`/rate/${existingSlotId}`}
+                      className="shrink-0 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      Edit
+                    </Link>
+                  ) : backlogSlotId ? (
+                    <Link
+                      href={`/rate/${backlogSlotId}`}
+                      className="shrink-0 text-sm bg-orange-600 hover:bg-orange-500 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      Rate
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => onCreateSlot(r.room.id)}
+                      disabled={isCreating}
+                      className="shrink-0 text-sm bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      {isCreating ? '…' : 'Rate'}
+                    </button>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 export default function SortableDashboard({ rankings, sortLabels, stats, currentUserId, backlogSlotsByRoom, userRatedSlotByRoom }: Props) {
   const router = useRouter()
   const [sort, setSort] = useState<SortKey>('overall')
@@ -50,6 +164,7 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
   const [cityFilter, setCityFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
   const [creatingSlotFor, setCreatingSlotFor] = useState<string | null>(null)
+  const [showRateModal, setShowRateModal] = useState(false)
 
   async function handleRateRoom(roomId: string) {
     setCreatingSlotFor(roomId)
@@ -95,8 +210,20 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
 
   return (
     <>
-      {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      {/* Rate modal */}
+      {showRateModal && (
+        <RateRoomModal
+          rankings={rankings}
+          backlogSlotsByRoom={backlogSlotsByRoom}
+          userRatedSlotByRoom={userRatedSlotByRoom}
+          onClose={() => setShowRateModal(false)}
+          onCreateSlot={handleRateRoom}
+          creatingSlotFor={creatingSlotFor}
+        />
+      )}
+
+      {/* Stats bar + Rate button */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: 'Sessions', value: stats.totalSessions.toString() },
           { label: 'Rooms rated', value: stats.totalRooms.toString() },
@@ -108,6 +235,17 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
           </div>
         ))}
       </div>
+
+      {/* Prominent Rate a Room button */}
+      <button
+        onClick={() => setShowRateModal(true)}
+        className="w-full mb-6 py-3 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-base shadow-lg shadow-orange-900/30"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+        Rate a Room
+      </button>
 
       <input
         type="text"
@@ -161,91 +299,95 @@ export default function SortableDashboard({ rankings, sortLabels, stats, current
             const isTopOverall = bestIn.overall === r.room.id
             const activeCategoryKey = sort as CategoryKey
             const isTopInSort = CATEGORY_KEYS.includes(activeCategoryKey) && bestIn[activeCategoryKey] === r.room.id
+            const existingSlotId = userRatedSlotByRoom[r.room.id]
+            const backlogSlotId = backlogSlotsByRoom[r.room.id]
+            const isCreating = creatingSlotFor === r.room.id
 
             return (
               <div
                 key={r.room.id}
-                className={`bg-gray-900 rounded-xl border p-5 ${isTopOverall ? 'border-orange-600/60' : 'border-gray-800'}`}
+                className={`bg-gray-900 rounded-xl border ${isTopOverall ? 'border-orange-600/60' : 'border-gray-800'}`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <span className="text-2xl font-bold text-gray-600 w-8 shrink-0 pt-0.5">{i + 1}</span>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/rooms/${r.room.id}`} className="hover:text-orange-400 transition-colors">
-                          <h3 className="font-semibold text-white text-lg leading-tight">{r.room.name}</h3>
-                        </Link>
-                        {isTopOverall && <span className="text-xs bg-orange-900/40 text-orange-400 px-2 py-0.5 rounded-full">#1 overall</span>}
-                        {!isTopOverall && isTopInSort && r.total_ratings > 0 && (
-                          <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-0.5 rounded-full">
-                            Best {sortLabels[sort].toLowerCase()}
-                          </span>
-                        )}
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <span className="text-2xl font-bold text-gray-600 w-8 shrink-0 pt-0.5">{i + 1}</span>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link href={`/rooms/${r.room.id}`} className="hover:text-orange-400 transition-colors">
+                            <h3 className="font-semibold text-white text-lg leading-tight">{r.room.name}</h3>
+                          </Link>
+                          {isTopOverall && <span className="text-xs bg-orange-900/40 text-orange-400 px-2 py-0.5 rounded-full">#1 overall</span>}
+                          {!isTopOverall && isTopInSort && r.total_ratings > 0 && (
+                            <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-0.5 rounded-full">
+                              Best {sortLabels[sort].toLowerCase()}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-sm mt-0.5">
+                          {r.room.company} · {r.room.city} · {r.room.time_limit} min
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          {r.total_ratings} rating{r.total_ratings !== 1 ? 's' : ''} across {r.slots_played} play{r.slots_played !== 1 ? 's' : ''}
+                        </p>
                       </div>
-                      <p className="text-gray-400 text-sm mt-0.5">
-                        {r.room.company} · {r.room.city} · {r.room.time_limit} min
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {r.total_ratings} rating{r.total_ratings !== 1 ? 's' : ''} across {r.slots_played} play{r.slots_played !== 1 ? 's' : ''}
-                      </p>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                    <div>
+                    <div className="text-right shrink-0">
                       <div className="text-3xl font-bold">
                         <OverallBadge value={r.overall} highlight={isTopOverall} />
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">overall</div>
                     </div>
-                    {(() => {
-                      const existingSlotId = userRatedSlotByRoom[r.room.id]
-                      const backlogSlotId = backlogSlotsByRoom[r.room.id]
-                      if (existingSlotId) {
-                        return (
-                          <Link
-                            href={`/rate/${existingSlotId}`}
-                            className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Edit Rating
-                          </Link>
-                        )
-                      }
-                      if (backlogSlotId) {
-                        return (
-                          <Link
-                            href={`/rate/${backlogSlotId}`}
-                            className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Rate
-                          </Link>
-                        )
-                      }
-                      return (
-                        <button
-                          onClick={() => handleRateRoom(r.room.id)}
-                          disabled={creatingSlotFor === r.room.id}
-                          className="text-xs bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          {creatingSlotFor === r.room.id ? '…' : 'Rate'}
-                        </button>
-                      )
-                    })()}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {CATEGORY_KEYS.map(key => (
+                      <div
+                        key={key}
+                        className={`text-center p-2 rounded-lg ${sort === key ? 'bg-orange-900/30 ring-1 ring-orange-600' : 'bg-gray-800'}`}
+                      >
+                        <div className="text-xs text-gray-400 mb-1 truncate">
+                          {sortLabels[key].split(' ')[0]}
+                        </div>
+                        <CategoryBadge value={r[key] ?? 0} highlight={bestIn[key] === r.room.id && r.total_ratings > 0} />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {CATEGORY_KEYS.map(key => (
-                    <div
-                      key={key}
-                      className={`text-center p-2 rounded-lg ${sort === key ? 'bg-orange-900/30 ring-1 ring-orange-600' : 'bg-gray-800'}`}
-                    >
-                      <div className="text-xs text-gray-400 mb-1 truncate">
-                        {sortLabels[key].split(' ')[0]}
-                      </div>
-                      <CategoryBadge value={r[key] ?? 0} highlight={bestIn[key] === r.room.id && r.total_ratings > 0} />
-                    </div>
-                  ))}
-                </div>
+                {/* Rate / Edit Rating — full-width bottom button */}
+                {existingSlotId ? (
+                  <Link
+                    href={`/rate/${existingSlotId}`}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-medium text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-800 rounded-b-xl transition-colors border-t border-gray-800"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit your rating
+                  </Link>
+                ) : backlogSlotId ? (
+                  <Link
+                    href={`/rate/${backlogSlotId}`}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 rounded-b-xl transition-colors border-t border-orange-700"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    Rate this room
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => handleRateRoom(r.room.id)}
+                    disabled={isCreating}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 disabled:opacity-60 rounded-b-xl transition-colors border-t border-orange-700"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    {isCreating ? 'Opening…' : 'Rate this room'}
+                  </button>
+                )}
               </div>
             )
           })}
