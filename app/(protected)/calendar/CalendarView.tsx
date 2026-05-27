@@ -73,21 +73,6 @@ function isSameDay(a: Date, b: Date) {
   )
 }
 
-function EscapedBadge({ escaped }: { escaped: boolean | null }) {
-  if (escaped === true)
-    return (
-      <span className="text-xs bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
-        ✅ Escaped
-      </span>
-    )
-  if (escaped === false)
-    return (
-      <span className="text-xs bg-red-900/30 text-red-400 px-2 py-0.5 rounded-full">
-        ❌ Did not escape
-      </span>
-    )
-  return null
-}
 
 function SlotCard({
   slot,
@@ -113,7 +98,6 @@ function SlotCard({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-white">{slot.escape_rooms?.name}</h3>
-            <EscapedBadge escaped={slot.escaped} />
           </div>
           <p className="text-gray-400 text-sm mt-0.5">
             {slot.escape_rooms?.company} · {slot.escape_rooms?.city}
@@ -162,7 +146,7 @@ function SlotCard({
           ))}
         </div>
       )}
-      {isAdmin && <SlotActions slotId={slot.id} escaped={slot.escaped} />}
+      {isAdmin && <SlotActions slotId={slot.id} />}
     </div>
   )
 }
@@ -190,6 +174,7 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
   const [listSearch, setListSearch] = useState('')
   const [listCityFilter, setListCityFilter] = useState('')
   const [listCompanyFilter, setListCompanyFilter] = useState('')
+  const [listUnratedOnly, setListUnratedOnly] = useState(false)
 
   const realSlots = slots.filter(s => !isBacklogSlot(s))
   const slotsByDate = new Map<string, SlotForCalendar[]>()
@@ -488,6 +473,15 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
                           ))}
                         </select>
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer w-fit">
+                        <input
+                          type="checkbox"
+                          checked={listUnratedOnly}
+                          onChange={e => setListUnratedOnly(e.target.checked)}
+                          className="w-4 h-4 accent-orange-500"
+                        />
+                        <span className="text-sm text-gray-400">Unrated only</span>
+                      </label>
                     </div>
 
                     {(() => {
@@ -499,7 +493,8 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
                           s.escape_rooms?.company.toLowerCase().includes(q)
                         const matchesCity = !listCityFilter || s.escape_rooms?.city === listCityFilter
                         const matchesCompany = !listCompanyFilter || s.escape_rooms?.company === listCompanyFilter
-                        return matchesSearch && matchesCity && matchesCompany
+                        const matchesUnrated = !listUnratedOnly || !s.ratings.find(r => r.user_id === currentUserId)
+                        return matchesSearch && matchesCity && matchesCompany && matchesUnrated
                       })
                       if (filteredPast.length === 0) {
                         return <p className="text-gray-500 text-sm text-center py-8">No sessions match your filters.</p>
