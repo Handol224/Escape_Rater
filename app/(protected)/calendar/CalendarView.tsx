@@ -187,6 +187,9 @@ function SlotChip({ slot, onClick }: { slot: SlotForCalendar; onClick: () => voi
 export default function CalendarView({ slots, currentUserId, isAdmin, playerCount }: Props) {
   const [view, setView] = useState<CalView>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [listSearch, setListSearch] = useState('')
+  const [listCityFilter, setListCityFilter] = useState('')
+  const [listCompanyFilter, setListCompanyFilter] = useState('')
 
   const realSlots = slots.filter(s => !isBacklogSlot(s))
   const slotsByDate = new Map<string, SlotForCalendar[]>()
@@ -453,18 +456,69 @@ export default function CalendarView({ slots, currentUserId, isAdmin, playerCoun
                     <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
                       Past Sessions
                     </h2>
-                    <div className="space-y-3">
-                      {past.map(slot => (
-                        <SlotCard
-                          key={slot.id}
-                          slot={slot}
-                          currentUserId={currentUserId}
-                          canRate={true}
-                          playerCount={playerCount}
-                          isAdmin={isAdmin}
-                        />
-                      ))}
+
+                    {/* Search + filters */}
+                    <div className="space-y-2 mb-4">
+                      <input
+                        type="text"
+                        value={listSearch}
+                        onChange={e => setListSearch(e.target.value)}
+                        placeholder="Search by name, city, or company…"
+                        className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500"
+                      />
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          value={listCityFilter}
+                          onChange={e => setListCityFilter(e.target.value)}
+                          className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500 flex-1"
+                        >
+                          <option value="">All cities</option>
+                          {[...new Set(past.map(s => s.escape_rooms?.city).filter(Boolean))].sort().map(city => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={listCompanyFilter}
+                          onChange={e => setListCompanyFilter(e.target.value)}
+                          className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500 flex-1"
+                        >
+                          <option value="">All companies</option>
+                          {[...new Set(past.map(s => s.escape_rooms?.company).filter(Boolean))].sort().map(company => (
+                            <option key={company} value={company}>{company}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+
+                    {(() => {
+                      const filteredPast = past.filter(s => {
+                        const q = listSearch.toLowerCase()
+                        const matchesSearch = !listSearch ||
+                          s.escape_rooms?.name.toLowerCase().includes(q) ||
+                          s.escape_rooms?.city.toLowerCase().includes(q) ||
+                          s.escape_rooms?.company.toLowerCase().includes(q)
+                        const matchesCity = !listCityFilter || s.escape_rooms?.city === listCityFilter
+                        const matchesCompany = !listCompanyFilter || s.escape_rooms?.company === listCompanyFilter
+                        return matchesSearch && matchesCity && matchesCompany
+                      })
+                      if (filteredPast.length === 0) {
+                        return <p className="text-gray-500 text-sm text-center py-8">No sessions match your filters.</p>
+                      }
+                      return (
+                        <div className="space-y-3">
+                          {filteredPast.map(slot => (
+                            <SlotCard
+                              key={slot.id}
+                              slot={slot}
+                              currentUserId={currentUserId}
+                              canRate={true}
+                              playerCount={playerCount}
+                              isAdmin={isAdmin}
+                            />
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </section>
                 )}
                 {slots.length === 0 && (
