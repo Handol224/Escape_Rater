@@ -23,6 +23,7 @@ export default function AccountMenu({ username, userId }: Props) {
   const [usernameError, setUsernameError] = useState('')
 
   // Password section state
+  const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saved' | 'error'>('idle')
@@ -66,9 +67,14 @@ export default function AccountMenu({ username, userId }: Props) {
   }
 
   async function handleSavePassword() {
+    if (!oldPassword) {
+      setPasswordStatus('error')
+      setPasswordError('Old password cannot be empty.')
+      return
+    }
     if (!newPassword) {
       setPasswordStatus('error')
-      setPasswordError('Password cannot be empty.')
+      setPasswordError('New password cannot be empty.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -77,6 +83,16 @@ export default function AccountMenu({ username, userId }: Props) {
       return
     }
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user!.email!,
+      password: oldPassword,
+    })
+    if (signInError) {
+      setPasswordStatus('error')
+      setPasswordError('Old password is incorrect.')
+      return
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) {
       setPasswordStatus('error')
@@ -84,6 +100,7 @@ export default function AccountMenu({ username, userId }: Props) {
     } else {
       setPasswordStatus('saved')
       setPasswordError('')
+      setOldPassword('')
       setNewPassword('')
       setConfirmPassword('')
     }
@@ -178,6 +195,7 @@ export default function AccountMenu({ username, userId }: Props) {
                 toggleSection('password')
                 setPasswordStatus('idle')
                 setPasswordError('')
+                setOldPassword('')
                 setNewPassword('')
                 setConfirmPassword('')
               }}
@@ -190,6 +208,16 @@ export default function AccountMenu({ username, userId }: Props) {
             </button>
             {activeSection === 'password' && (
               <div className="px-4 pb-3 space-y-2">
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={e => {
+                    setOldPassword(e.target.value)
+                    setPasswordStatus('idle')
+                  }}
+                  placeholder="Old password"
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm w-full focus:outline-none focus:border-orange-500"
+                />
                 <input
                   type="password"
                   value={newPassword}
